@@ -84,3 +84,27 @@ def test_activity_registry_api_creates_and_lists_activity(tmp_path: Path) -> Non
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_activity_timeline_template_is_downloadable(tmp_path: Path) -> None:
+    plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    state = WebState(plan)
+    registry = ActivityRegistry(tmp_path)
+    registry.create(
+        ActivityManifest(id="sample_handling", name="Sample Handling", kind=ActivityKind.EXPERIMENT)
+    )
+    server = DashboardServer(("127.0.0.1", 0), state, "models/yolo11n.pt", "cpu", registry=registry)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urlopen(
+            f"http://127.0.0.1:{server.server_port}/api/activities/sample_handling/timeline-template",
+            timeout=2,
+        ) as response:
+            content = response.read().decode("utf-8")
+            assert response.status == 200
+            assert "expected_step_id" in content
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

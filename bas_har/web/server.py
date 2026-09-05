@@ -523,6 +523,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
             self._send_json([record.model_dump(mode="json", by_alias=True) for record in records])
             return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/timeline-template"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/timeline-template"))
+                self.server.registry.load(activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            template = (
+                "id,take_id,start_s,end_s,expected_step_id,observed_action,result,"
+                "object_ids,region_ids,notes\n"
+                "event-1,take-id,00:00:01.000,00:00:03.000,step_id,describe action,"
+                "completed,,,\n"
+            ).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", 'attachment; filename="timeline_template.csv"')
+            self.send_header("Content-Length", str(len(template)))
+            self.end_headers()
+            self.wfile.write(template)
+            return
         if parsed.path.startswith("/api/activities/"):
             try:
                 activity_id = self._activity_id(parsed.path)

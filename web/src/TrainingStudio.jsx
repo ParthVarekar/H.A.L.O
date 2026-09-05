@@ -30,6 +30,7 @@ function TrainingStudio() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [selectedId, setSelectedId] = useState("");
   const [takes, setTakes] = useState([]);
+  const [timeline, setTimeline] = useState([]);
   const [sessionId, setSessionId] = useState("session-1");
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -51,12 +52,19 @@ function TrainingStudio() {
   useEffect(() => {
     if (!selectedId) {
       setTakes([]);
+      setTimeline([]);
       return undefined;
     }
     let active = true;
-    readJson(`/api/activities/${encodeURIComponent(selectedId)}/takes`)
-      .then((nextTakes) => {
-        if (active) setTakes(nextTakes);
+    Promise.all([
+      readJson(`/api/activities/${encodeURIComponent(selectedId)}/takes`),
+      readJson(`/api/activities/${encodeURIComponent(selectedId)}/timeline`),
+    ])
+      .then(([nextTakes, nextTimeline]) => {
+        if (active) {
+          setTakes(nextTakes);
+          setTimeline(nextTimeline);
+        }
       })
       .catch((requestError) => setError(requestError.message));
     return () => {
@@ -110,6 +118,31 @@ function TrainingStudio() {
       if (!response.ok) throw new Error(data.error || `Upload failed: ${response.status}`);
       setTakes((current) => [...current, data]);
       setMessage(`${file.name} uploaded and recorded as ${data.id}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function uploadTimeline(file) {
+    if (!file || !selectedId) return;
+    setUploadBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/activities/${encodeURIComponent(selectedId)}/timeline`, {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+          "X-Filename": file.name,
+        },
+        body: file,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `Timeline import failed: ${response.status}`);
+      setTimeline(data.records);
+      setMessage(`${data.records.length} timeline records imported and validated.`);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -219,6 +252,31 @@ function TrainingStudio() {
                 <span className="section-kicker">NEXT WORKFLOW</span>
                 <strong>{selected.name}</strong>
                 <p>Procedure builder, timestamp ground truth, assisted annotation, and training will attach to this package.</p>
+              </div>
+              <div className="upload-block">
+                <div className="panel-heading compact">
+                  <div><span className="section-kicker">STEP 03</span><h2>Ground truth timeline</h2></div>
+                  <span className="step-count">{timeline.length}</span>
+                </div>
+                <p className="workflow-copy">Import the timestamps and actions you verified in the recording. The Studio checks every row against the uploaded video.</p>
+                <div className="timeline-actions">
+                  <a className="button button-quiet" href={`/api/activities/${encodeURIComponent(selectedId)}/timeline-template`}>Download CSV template</a>
+                  <label className="button button-primary file-button">
+                    Import CSV or Excel
+                    <input type="file" accept=".csv,.xlsx,.xlsm" onChange={(event) => uploadTimeline(event.target.files[0])} disabled={uploadBusy} />
+                  </label>
+                </div>
+                {timeline.length > 0 && (
+                  <div className="ground-truth-list">
+                    {timeline.slice(0, 6).map((record) => (
+                      <div className="ground-truth-row" key={record.id}>
+                        <span><strong>{record.expected_step_id}</strong><small>{record.start_s.toFixed(2)}s–{record.end_s.toFixed(2)}s · {record.observed_action}</small></span>
+                        <em>{record.result}</em>
+                      </div>
+                    ))}
+                    {timeline.length > 6 && <small className="more-label">+ {timeline.length - 6} more records</small>}
+                  </div>
+                )}
               </div>
             </div>
           )}

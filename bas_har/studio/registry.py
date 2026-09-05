@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+from pydantic import TypeAdapter
 
 from bas_har.config import activities_dir
 from bas_har.schema.activity_schema import ActivityId, ActivityManifest
@@ -49,7 +50,8 @@ class ActivityRegistry:
         return manifests
 
     def package_dir(self, activity_id: ActivityId | str) -> Path:
-        return self.root / str(activity_id)
+        validated_id = TypeAdapter(ActivityId).validate_python(activity_id)
+        return self.root / validated_id
 
     def _write_manifest(self, package_dir: Path, manifest: ActivityManifest) -> None:
         package_dir.mkdir(parents=True, exist_ok=True)

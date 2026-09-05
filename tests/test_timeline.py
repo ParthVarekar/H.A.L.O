@@ -10,7 +10,7 @@ import pytest
 
 from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
 from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import register_take
+from bas_har.studio.takes import list_takes, register_take
 from bas_har.studio.timeline import import_timeline, parse_time, read_timeline
 
 
@@ -42,10 +42,7 @@ def test_parse_time_rejects_invalid_value() -> None:
 
 def test_import_timeline_validates_duration_and_persists(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
-    take_id = next(iter(registry.list_activities()))
-    take_record = __import__("bas_har.studio.takes", fromlist=["list_takes"]).list_takes(
-        registry, take_id.activity_id
-    )[0]
+    take_record = list_takes(registry, "sample_handling")[0]
     source = tmp_path / "timeline.csv"
     source.write_text(
         "id,take_id,start_s,end_s,expected_step_id,observed_action,result,object_ids,region_ids,notes\n"

@@ -143,6 +143,18 @@ h2 { margin-top: 7px; font-size: 17px; letter-spacing: -0.02em; }
 .take-row strong { overflow: hidden; color: var(--soft); font-family: "DM Mono", monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .take-row small { color: var(--muted); font-size: 10px; }
 .take-row em { color: var(--green); font-family: "DM Mono", monospace; font-size: 9px; font-style: normal; }
+.workflow-copy { margin-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.timeline-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.timeline-actions .button { display: inline-block; text-decoration: none; }
+.file-button { position: relative; overflow: hidden; }
+.file-button input { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; opacity: 0; }
+.ground-truth-list { display: grid; gap: 7px; margin-top: 13px; }
+.ground-truth-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(0, 0, 0, 0.12); }
+.ground-truth-row span { display: grid; gap: 4px; min-width: 0; }
+.ground-truth-row strong { overflow: hidden; color: var(--soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.ground-truth-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.ground-truth-row em { color: var(--green); font-family: "DM Mono", monospace; font-size: 9px; font-style: normal; text-transform: uppercase; }
+.more-label { color: var(--muted); font-size: 10px; }
 .success-banner { margin-top: 12px; padding: 10px 12px; color: #caffeb; border: 1px solid rgba(68, 216, 163, 0.3); border-radius: 7px; background: rgba(68, 216, 163, 0.1); font-size: 12px; }
 
 @media (max-width: 1000px) {
