@@ -1,0 +1,7 @@
+# Red/blue box: skip the grasp step, go straight to place_red_box.
+# Should fire SKIP_DETECTED alert.
+
+open:big_box x30
+wait:5
+place:small_red_box x30
+wait:5

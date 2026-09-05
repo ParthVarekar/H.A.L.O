@@ -1,0 +1,8 @@
+path: .
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: big_box
+  1: small_red_box
+  2: small_blue_box

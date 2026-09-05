@@ -1,0 +1,16 @@
+# Red/blue box golden path (mocked). Counts meet the YAML min_frames rules.
+# open_big_box needs 30 frames of opening; remove_red_box needs 15 grasping;
+# place_red_box needs 10 placing + 20 in_region; etc.
+
+open:big_box x30
+wait:5
+grasp:small_red_box x15
+wait:5
+place:small_red_box x20
+wait:5
+grasp:small_blue_box x15
+wait:5
+place:small_blue_box x20
+wait:5
+close:big_box x30
+wait:5

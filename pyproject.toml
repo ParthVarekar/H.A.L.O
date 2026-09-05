@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bas-har"
+version = "0.1.0"
+description = "AI Human Activity Recognition for on-board BAS experiments (SIH26174)"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "Parth" }]
+keywords = ["har", "computer-vision", "isro", "bas", "sih2026", "activity-recognition"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Phase 0 deps only. Defer heavy ML deps to phase-specific extras.
+dependencies = [
+    "pydantic>=2.6,<3",
+    "pyyaml>=6.0",
+    "loguru>=0.7",
+]
+
+[project.optional-dependencies]
+# Phase 1+ perception stack.
+perception = [
+    "ultralytics>=8.1",
+    "mediapipe==0.10.21 ; python_version < '3.13'",
+    "opencv-python<5 ; python_version < '3.13'",
+    "numpy<2 ; python_version < '3.13'",
+]
+# Phase 5 streaming.
+streaming = [
+    "av>=11.0",
+    "numpy<2",
+    "opencv-python<5",
+]
+voice = [
+    "pyttsx3>=2.90 ; sys_platform == 'win32' or sys_platform == 'linux'",
+]
+studio = [
+    "openpyxl>=3.1",
+]
+packaging = [
+    "pyinstaller>=6.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+bas-har = "bas_har.__main__:main"
+validate-plan = "bas_har.schema.cli:main"
+record-dataset = "scripts.record_dataset:main"
+preview-perception = "scripts.preview_perception:main"
+replay-motor = "scripts.replay_motor:main"
+run-engine = "scripts.run_engine:main"
+analyze-sequence = "scripts.analyze_sequence:main"
+run-gui = "bas_har.web.server:main"
+run-web = "bas_har.web.server:main"
+train-yolo = "scripts.train_yolo:main"
+prepare-yolo-dataset = "scripts.prepare_dataset:main"
+annotate-yolo = "scripts.annotate_dataset:main"
+export-onnx = "scripts.export_onnx:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bas_har*", "scripts*"]
+exclude = ["tests*", "datasets*", "experiments*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["datasets", "models", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # do not call in function defaults (pydantic Field uses these)
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

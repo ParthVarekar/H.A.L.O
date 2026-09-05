@@ -1,0 +1,120 @@
+id: BAS-DEMO-RBB-001
+name: "Red/Blue Box Sort"
+version: 0.1.0
+author: parth
+created: 2026-09-03
+description: >
+  A cardboard box contains two colored blocks. The astronaut opens the lid,
+  picks up the red block and returns it, picks up the blue block and returns
+  it, then closes the lid. Used as the current video validation target.
+
+camera:
+  source: 0
+  fps: 30
+  resolution: [1280, 720]
+
+fiducial:
+  type: none
+
+objects:
+  - id: big_box
+    classes: [box]
+    colors_any: [brown, cardboard, grey]
+  - id: small_red_box
+    classes: [box]
+    colors_any: [red]
+  - id: small_blue_box
+    classes: [box]
+    colors_any: [blue]
+
+regions:
+  - box_interior
+
+region_geometries:
+  box_interior:
+    - [360, 320]
+    - [920, 320]
+    - [920, 520]
+    - [360, 520]
+
+steps:
+  - id: open_big_box
+    description: "Astronaut opens the lid and exposes both colored blocks."
+    evidence:
+      - kind: hand_object_interaction
+        object: big_box
+        label: opening
+        min_frames: 30
+    next: [remove_red_box]
+    timeout_s: 60
+    expected_duration_s: 5
+
+  - id: remove_red_box
+    description: "Astronaut picks up and removes the red block from the box."
+    evidence:
+      - kind: hand_object_interaction
+        object: small_red_box
+        label: grasping
+        min_frames: 15
+    next: [place_red_box]
+    timeout_s: 45
+    expected_duration_s: 4
+
+  - id: place_red_box
+    description: "Astronaut returns the red block into the box."
+    evidence:
+      - kind: hand_object_interaction
+        object: small_red_box
+        label: placing
+        min_frames: 10
+      - kind: object_location
+        object: small_red_box
+        in_region: box_interior
+        min_frames: 20
+    next: [remove_blue_box]
+    timeout_s: 30
+    expected_duration_s: 3
+
+  - id: remove_blue_box
+    description: "Astronaut picks up and removes the blue block from the box."
+    evidence:
+      - kind: hand_object_interaction
+        object: small_blue_box
+        label: grasping
+        min_frames: 15
+    next: [place_blue_box]
+    timeout_s: 45
+    expected_duration_s: 4
+
+  - id: place_blue_box
+    description: "Astronaut returns the blue block into the box."
+    evidence:
+      - kind: hand_object_interaction
+        object: small_blue_box
+        label: placing
+        min_frames: 10
+      - kind: object_location
+        object: small_blue_box
+        in_region: box_interior
+        min_frames: 20
+    next: [close_big_box]
+    timeout_s: 30
+    expected_duration_s: 3
+
+  - id: close_big_box
+    description: "Astronaut closes the lid of the big box."
+    evidence:
+      - kind: hand_object_interaction
+        object: big_box
+        label: closing
+        min_frames: 30
+    next: []
+    timeout_s: 60
+    expected_duration_s: 4
+
+alert_policy:
+  skip_confidence_threshold: 0.85
+  skip_persistence_frames: 5
+  rate_limit_s: 5
+  silence_window_s: 60
+  pause_tolerance_s: 30
