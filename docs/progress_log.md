@@ -54,6 +54,22 @@
 - Next exact action: expose the registry through the existing web service and add the React Training
   Studio shell.
 
+## Checkpoint 2: browser ingestion and ground truth
+
+**Status:** complete
+
+- Added local video ingestion with SHA-256 deduplication and OpenCV metadata probing.
+- Added `/api/activities/<id>/takes` list and upload endpoints.
+- Added CSV/Excel timeline parsing with seconds and `HH:MM:SS.mmm` support.
+- Added duration and take-reference validation plus persistent `timeline.jsonl` records.
+- Added `/api/activities/<id>/timeline` and downloadable CSV template endpoints.
+- Added React drop zones for training videos and ground-truth timelines, including recording-session
+  metadata.
+- Added the `studio` extra for optional Excel parsing.
+- Verification: full suite passed; 80 tests passed; Ruff lint and format checks passed; React build
+  passed.
+- Next exact action: add the guided procedure builder and validated plan persistence.
+
 ## Next exact checkpoint
 
 1. Inspect and extend `bas_har/schema/` with activity, take, timeline, annotation, job, report,

@@ -25,6 +25,7 @@ from bas_har.schema.cli import load_plan
 from bas_har.schema.event_schema import EventRecord
 from bas_har.schema.plan_schema import ExperimentPlan
 from bas_har.studio.registry import ActivityRegistry
+from bas_har.studio.plans import load_activity_plan, save_activity_plan
 from bas_har.studio.takes import list_takes, register_take
 from bas_har.studio.timeline import import_timeline, list_timeline
 from bas_har.voice import ConfirmationSound
@@ -531,17 +532,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
                 return
             template = (
-                "id,take_id,start_s,end_s,expected_step_id,observed_action,result,"
-                "object_ids,region_ids,notes\n"
-                "event-1,take-id,00:00:01.000,00:00:03.000,step_id,describe action,"
-                "completed,,,\n"
-            ).encode("utf-8")
+                b"id,take_id,start_s,end_s,expected_step_id,observed_action,result,"
+                b"object_ids,region_ids,notes\n"
+                b"event-1,take-id,00:00:01.000,00:00:03.000,step_id,describe action,"
+                b"completed,,,\n"
+            )
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
             self.send_header("Content-Disposition", 'attachment; filename="timeline_template.csv"')
             self.send_header("Content-Length", str(len(template)))
             self.end_headers()
             self.wfile.write(template)
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/plan"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/plan"))
+                plan = load_activity_plan(self.server.registry, activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(plan.model_dump(mode="json", by_alias=True))
             return
         if parsed.path.startswith("/api/activities/"):
             try:
@@ -585,6 +595,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc)}, HTTPStatus.CONFLICT)
         except (ValueError, ValidationError) as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+    def do_PUT(self) -> None:
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.count("/") != 4 or not parsed.path.endswith("/plan"):
+            self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+            return
+        try:
+            self._save_plan(parsed.path.removesuffix("/plan"))
+        except FileNotFoundError as exc:
+            self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+        except (ValueError, ValidationError) as exc:
+            self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+    def _save_plan(self, activity_path: str) -> None:
+        activity_id = self._activity_id(activity_path)
+        payload = self._read_json()
+        plan = ExperimentPlan.model_validate(payload)
+        saved = save_activity_plan(self.server.registry, activity_id, plan)
+        self._send_json(saved.model_dump(mode="json", by_alias=True), HTTPStatus.OK)
 
     def _upload_take(self, activity_path: str) -> None:
         try:
@@ -650,7 +679,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 raise ValueError("uploaded timeline body is empty")
             if content_length > 100_000_000:
                 raise ValueError("uploaded timeline exceeds the 100 MB local limit")
-            temp_path = self.server.registry.package_dir(manifest.activity_id) / f".timeline-{uuid4().hex}{suffix}"
+            temp_path = (
+                self.server.registry.package_dir(manifest.activity_id)
+                / f".timeline-{uuid4().hex}{suffix}"
+            )
             remaining = content_length
             with temp_path.open("wb") as handle:
                 while remaining:

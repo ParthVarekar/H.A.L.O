@@ -23,7 +23,9 @@ def _write_video(path: Path) -> None:
 
 def _registry(tmp_path: Path) -> ActivityRegistry:
     registry = ActivityRegistry(tmp_path / "activities")
-    registry.create(ActivityManifest(id="sample_handling", name="Sample Handling", kind=ActivityKind.EXPERIMENT))
+    registry.create(
+        ActivityManifest(id="sample_handling", name="Sample Handling", kind=ActivityKind.EXPERIMENT)
+    )
     source = tmp_path / "take.mp4"
     _write_video(source)
     register_take(registry, "sample_handling", source, source.name, "session-1")

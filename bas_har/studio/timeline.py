@@ -136,7 +136,11 @@ def _read_xlsx(path: Path) -> list[dict[str, Any]]:
     sheet = workbook["Timeline"]
     rows = sheet.iter_rows(values_only=True)
     headers = [str(value).strip() if value is not None else "" for value in next(rows, ())]
-    return [dict(zip(headers, row, strict=False)) for row in rows if any(value is not None for value in row)]
+    return [
+        dict(zip(headers, row, strict=False))
+        for row in rows
+        if any(value is not None for value in row)
+    ]
 
 
 def _split_ids(value: Any) -> list[str]:
