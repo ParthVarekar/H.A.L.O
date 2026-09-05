@@ -4,7 +4,7 @@
 **Authoritative spec**: `docs/SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx` (in `C:\Users\Parth\Downloads`)
 **Mission**: SIH26174 — AI HAR for on-board BAS experiments (ISRO, Gaganyaan/BAS-01 2028).
 **Branch you'll be picked up from**: main.
-**Last verified state**: 115 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass, SIH PDF rendered and visually checked.
+**Last verified state**: 115 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass, SIH PDF rendered and visually checked. The React Training Studio contains a separate MELFI activity with one uploaded take, a six-step plan, and six imported timeline records; visual annotation has not started.
 
 ---
 
@@ -96,14 +96,14 @@ Cross-cutters:
 
 ## 4. Critical files to read first
 
-1. `AGENTS.md` — AI-assistant conventions (ruff, no comments, schema-first, Python pin, etc.). **Read this first.**
-2. `docs/architecture.md` — what's in each phase.
-3. `docs/validation_matrix.md` — current pass/fail table.
-4. `docs/risk_register.md` — known issues.
-5. `bas_har/schema/plan_schema.py` — the YAML schema (the contract).
-6. `bas_har/procedure/engine.py` — the brain. Read `_pick_next`, `_find_later_step_match`, `step`.
-7. `bas_har/perception/pipeline.py` — the eye. Returns `PerceptionResult`.
-8. `bas_har/web/server.py` — the capture service and HTTP API; `web/src/App.jsx` is the React shell.
+1. `HANDOVER.md` — current state, conventions, and next action.
+2. `AGENTS.md` — AI-assistant conventions (Ruff, no comments, schema-first, Python pin, etc.).
+3. `docs/architecture.md` — phase architecture and boundaries.
+4. `docs/validation_matrix.md` — current pass/fail table.
+5. `docs/risk_register.md` — known issues and mitigations.
+6. `bas_har/schema/plan_schema.py` — the YAML schema contract.
+7. `bas_har/procedure/engine.py` — the FSM brain.
+8. `web/src/App.jsx`, `web/src/TrainingStudio.jsx`, and `bas_har/web/server.py` — the active React shell, Studio, and service.
 
 ---
 
@@ -139,6 +139,20 @@ Cross-cutters:
 8. **The `engine.py` `_pick_next` resets accumulator state for candidate steps.** This is the right behavior for the transition path but means each frame resets the persistence counter. The skip path's `_find_later_step_match` does NOT reset, so skip detection has continuous persistence. If you change the engine, keep this asymmetry in mind.
 
 9. **YOLOv11n's class labels are COCO-pretrained**; the red/blue/big box classes are NOT in COCO. Once you record real takes and fine-tune, swap the model path in `bas_har/perception/detector.py` (or via `--yolo-model` on `preview-perception` / `run-engine`).
+
+10. **The MELFI timeline is incomplete.** The uploaded take is 153.04 seconds, but the supplied
+    ground truth ends at 105.0 seconds. The final 48.04 seconds must be reviewed and labelled
+    before evaluation; do not extend the last event without evidence.
+
+11. **The analyser metadata was inaccurate.** The Studio measured 25.0065 FPS and 768x432 for
+    `studying cells in space.mp4`, not the analyser's 29.97 FPS and 1920x1080. Uploaded-take
+    metadata is authoritative.
+
+12. **The MELFI plan includes contextual classes.** `nasa_logo`, `esa_logo`, and `title_card` are
+    currently in the detector-class list because they are referenced by the supplied procedure.
+    If they are not manually boxed, the quality gate will report missing classes. Decide whether
+    they should remain detector targets or be moved to non-detector scene metadata before quality
+    checking.
 
 ---
 
@@ -182,16 +196,17 @@ Total: 115 tests. All passing as of this handover. The continuation adds coverag
 
 ## 9. Historical next chunks before the React migration
 
+The list below is retained for historical context only. It is superseded by the current status in
+Sections 12–16 and must not be treated as an open task list.
+
 The user wants the **fastest working prototype / MVP**. Per the locked decisions:
 
-1. **Wire live capture into the GUI** (small, high impact). `bas_har/gui/app.py::_capture_frame` returns None; replace with an OpenCV `VideoCapture` running in a `QThread`. ~50 lines.
-2. **Add `voice` extra to `pyproject.toml`** so TTS installs cleanly: `pyttsx3>=2.90 ; sys_platform == 'win32' or sys_platform == 'linux'`. Then drop `--no-tts` from default and test that the TTS thread works (pyttsx3 + PySide6 is known to deadlock on some platforms; the queue+thread pattern in `bas_har/voice/tts.py` already mitigates this).
-3. **Implement `object_location: in_region` and `object_visible: outside_of` properly.** Add `region_geometries` to the YAML schema. Restore the dropped rules in `experiments/red_blue_box/experiment_plan.yaml`. Add tests.
-4. **Record real red/blue takes** with `record-dataset` and fine-tune YOLOv11-n on them. (`scripts/train_yolo.py` does not exist yet; the user has been told to record first.)
-5. **Phase 5 (IO)**: RTSP sub-stream + MP4 circular buffer + CRC-verified JSONL. Optional for MVP but the SIH rubric scores on it.
-6. **Phase 6: SIH idea submission docs**. `docs/architecture.md` and `docs/validation_matrix.md` are the inputs; produce a single PDF + GitHub link.
-7. **Phase 7: packaging**. ONNX export, PyInstaller, single-binary distribution.
-8. **Phase 9: parked** — 3D HMR, Jetson bring-up, learned temporal head. Don't touch.
+1. Live capture is implemented by the React web service; the old PySide6 path is removed.
+2. The `voice` extra and default TTS behavior are implemented.
+3. Region geometry and `in_region`/`outside_of` evidence are implemented and tested.
+4. Phase 5 I/O, SIH submission documentation, and React PyInstaller packaging are implemented.
+5. Real model training still depends on user-labelled, independent activity sessions.
+6. Phase 9 remains parked: 3D HMR, Jetson bring-up, and learned temporal head.
 
 ---
 
@@ -325,3 +340,37 @@ split mode and its metrics must be labeled as leakage-prone.
 The prior visual annotations were intentionally cleared on 2026-09-06 at the user's request. The
 activity plan, uploaded video, recording session, and all eight ground-truth timeline rows were
 verified as preserved. The Training Studio view was reset and is ready to annotate from frame one.
+
+## 15. Current MELFI activity intake
+
+This section supersedes the concrete-hardening intake details above when resuming the latest user
+task.
+
+- Activity: `cold_stowage_melfi` — `Cold Stowage and MELFI Operations`.
+- Package path: `activities/cold_stowage_melfi/`.
+- Procedure: `Cold Stowage and MELFI Overview`, six validated steps.
+- Objects/classes: `interviewee`, `melfi_freezer`, `dewar_compartment`, `sample_container`,
+  `control_panel`, `nasa_logo`, `esa_logo`, and `title_card`.
+- Take: `studying_cells_in_space-c2dce8af89` from `studying cells in space.mp4`.
+- Recording session: `cold_stowage_melfi_session_001`.
+- Studio-probed metadata: 153.04 seconds, 25.0065 FPS, 768x432.
+- Ground truth: six imported records, covering 0.0–105.0 seconds.
+- Visual annotations: zero; the package is waiting for manual boxes in STEP 05.
+- Dataset: not prepared for this activity; training and evaluation have not started.
+
+The analyser supplied 153.0 seconds, 29.97 FPS, and 1920x1080, but the Studio probe is the source
+of truth for the uploaded file. The analyser timeline leaves 105.0–153.04 seconds unlabelled. Review
+that interval before treating the timeline as complete. Do not invent a final action to fill the gap.
+
+The next exact action is to select this activity in the React Studio, review the six steps and the
+unlabelled final interval, then draw and save boxes for the chosen detector classes. After labels
+are complete, add independent recording sessions before preparing the dataset and starting CUDA
+training. The current plan includes logo/title classes; either label them consistently or remove
+them from the detector plan before running the quality gate.
+
+## 16. Documentation state
+
+`docs/architecture.md`, `docs/validation_matrix.md`, `docs/risk_register.md`, and
+`docs/progress_log.md` must be read together with this handover. The historical sections are kept
+for traceability, while the latest checkpoint and unresolved risks are recorded in the final
+sections of each document.

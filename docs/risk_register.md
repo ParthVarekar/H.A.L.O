@@ -18,3 +18,7 @@
 | 16 | YOLO's `cls` and the plan's `object_id` are different things | High | High | Resolved: YAML `objects[].id` is a logical name; YAML `objects[].classes` is the detector's class. Evidence checks the `cls` from the detector against the spec's `classes`. Replay DSL and tests use the correct mapping. |
 | 9 | Region geometry is camera-view dependent | Medium | Low | Store polygons in the experiment plan for the selected camera resolution; add calibration tooling if camera placement changes. |
 | 10 | 3D HMR is parked but docs call it the "innovation differentiator" | High | Low | Strategic Research doc reframes as "orientation-diverse augmentation" which we can ship in 2D first (Phase 9) without SMPL. |
+| 17 | Video analyser metadata disagrees with the uploaded file | Medium | Medium | Treat Studio-probed metadata as authoritative; record analyser metadata only as an audit discrepancy. |
+| 18 | Imported timeline ends before the video | High | High | Review and annotate 105.0–153.04 seconds before evaluation; never extend an event without evidence. |
+| 19 | Contextual title/logo classes are included as detector classes | Medium | Medium | Decide before quality checking whether to box them consistently or remove them from the detector plan. |
+| 20 | MELFI activity has one recording session and no visual labels | Certain | High | Complete STEP 05 boxes and add independent sessions before treating training or evaluation as reliable. |

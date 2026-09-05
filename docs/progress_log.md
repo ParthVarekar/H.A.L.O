@@ -5,8 +5,7 @@
 **Date:** 2026-09-05
 **Repository:** `C:\Users\Parth\Desktop\HAR_for_BAS`
 **Active UI:** React dashboard at `http://127.0.0.1:5767`
-**Current branch information:** Handover identifies `main`; this working directory did not expose
-  a Git repository root during the latest read-only status check.
+**Current branch information:** `main`.
 
 ## Verified before this continuation
 
@@ -291,3 +290,27 @@ Each implementation entry must record:
 
 Do not mark a phase complete without the corresponding tests and smoke checks. Do not touch parked
 3D HMR, Jetson, or learned temporal-head work without a new user decision.
+
+## Checkpoint 16: MELFI activity intake
+
+**Date:** 2026-09-06
+**Status:** staged for manual visual annotation
+
+- Created the separate activity `cold_stowage_melfi` so the MELFI video is not mixed with the
+  Concrete Hardening procedure.
+- Saved and validated a six-step procedure named `Cold Stowage and MELFI Overview`.
+- Uploaded `studying cells in space.mp4` as take `studying_cells_in_space-c2dce8af89` under
+  recording session `cold_stowage_melfi_session_001`.
+- The Studio-probed metadata is 153.04 seconds, 25.0065 FPS, and 768x432. This supersedes the
+  analyser's reported 29.97 FPS and 1920x1080.
+- Imported six timeline records with the actual generated take ID. The supplied records cover
+  0.0–105.0 seconds, leaving 48.04 seconds for manual review; no unsupported events were added.
+- No visual annotations, dataset, training job, evaluation report, or release exists for this
+  activity yet.
+- The plan currently includes five physical detector candidates plus `nasa_logo`, `esa_logo`, and
+  `title_card`. The quality gate will require labels for every plan class, so contextual classes
+  must either be boxed consistently or removed from the detector plan before quality checking.
+
+**Next exact action:** select `cold_stowage_melfi` in the React Studio, review the final 48.04 seconds
+of the video and the six imported records, then draw and save boxes in STEP 05. Add independent
+recording sessions before relying on validation, evaluation, or training metrics.
