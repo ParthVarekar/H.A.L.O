@@ -7,10 +7,10 @@ description: Overview of Cold Stowage operations and MELFI freezer hardware on t
   ISS.
 camera:
   source: 0
-  fps: 30
+  fps: 25
   resolution:
-  - 1920
-  - 1080
+  - 768
+  - 432
 fiducial:
   type: none
   family: tag36h11
@@ -35,6 +35,14 @@ objects:
 - id: control_panel
   classes:
   - control_panel
+  colors_any: []
+- id: astronaut_1
+  classes:
+  - astronaut
+  colors_any: []
+- id: computer
+  classes:
+  - computer
   colors_any: []
 - id: nasa_logo
   classes:
@@ -126,6 +134,34 @@ steps:
   evidence:
   - kind: object_visible
     object: control_panel
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - step_007
+  timeout_s: 60.0
+  expected_duration_s: 10.0
+- id: step_007
+  description: Astronaut works with visible ISS equipment and a mounted computer.
+  evidence:
+  - kind: object_visible
+    object: computer
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - step_008
+  timeout_s: 60.0
+  expected_duration_s: 38.0
+- id: step_008
+  description: ESA logo animation appears as the video end card.
+  evidence:
+  - kind: object_visible
+    object: esa_logo
     label: null
     state: null
     outside_of: null

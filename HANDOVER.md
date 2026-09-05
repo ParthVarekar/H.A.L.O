@@ -4,7 +4,7 @@
 **Authoritative spec**: `docs/SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx` (in `C:\Users\Parth\Downloads`)
 **Mission**: SIH26174 — AI HAR for on-board BAS experiments (ISRO, Gaganyaan/BAS-01 2028).
 **Branch you'll be picked up from**: main.
-**Last verified state**: 115 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass, SIH PDF rendered and visually checked. The React Training Studio contains a separate MELFI activity with one uploaded take, a six-step plan, and six imported timeline records; visual annotation has not started.
+**Last verified state**: 115 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass, SIH PDF rendered and visually checked. The React Training Studio contains a separate MELFI activity with one uploaded take, an eight-step plan, and eight imported timeline records covering the full take; visual annotation has not started.
 
 ---
 
@@ -140,9 +140,10 @@ Cross-cutters:
 
 9. **YOLOv11n's class labels are COCO-pretrained**; the red/blue/big box classes are NOT in COCO. Once you record real takes and fine-tune, swap the model path in `bas_har/perception/detector.py` (or via `--yolo-model` on `preview-perception` / `run-engine`).
 
-10. **The MELFI timeline is incomplete.** The uploaded take is 153.04 seconds, but the supplied
-    ground truth ends at 105.0 seconds. The final 48.04 seconds must be reviewed and labelled
-    before evaluation; do not extend the last event without evidence.
+10. **The MELFI timeline was initially incomplete.** The final 48.04 seconds were reviewed from
+    the actual video and added as two evidence-backed records: astronaut/computer activity through
+    143.04 seconds and the ESA end card through 153.04 seconds. The surrounding station hardware
+    remains deliberately unclassified.
 
 11. **The analyser metadata was inaccurate.** The Studio measured 25.0065 FPS and 768x432 for
     `studying cells in space.mp4`, not the analyser's 29.97 FPS and 1920x1080. Uploaded-take
@@ -348,25 +349,26 @@ task.
 
 - Activity: `cold_stowage_melfi` — `Cold Stowage and MELFI Operations`.
 - Package path: `activities/cold_stowage_melfi/`.
-- Procedure: `Cold Stowage and MELFI Overview`, six validated steps.
+- Procedure: `Cold Stowage and MELFI Overview`, eight validated steps.
 - Objects/classes: `interviewee`, `melfi_freezer`, `dewar_compartment`, `sample_container`,
-  `control_panel`, `nasa_logo`, `esa_logo`, and `title_card`.
+  `control_panel`, `astronaut`, `computer`, `nasa_logo`, `esa_logo`, and `title_card`.
 - Take: `studying_cells_in_space-c2dce8af89` from `studying cells in space.mp4`.
 - Recording session: `cold_stowage_melfi_session_001`.
 - Studio-probed metadata: 153.04 seconds, 25.0065 FPS, 768x432.
-- Ground truth: six imported records, covering 0.0–105.0 seconds.
+- Activity camera profile: 25 FPS, 768x432, aligned to the verified take.
+- Ground truth: eight imported records, covering 0.0–153.04 seconds.
 - Visual annotations: zero; the package is waiting for manual boxes in STEP 05.
 - Dataset: not prepared for this activity; training and evaluation have not started.
 
 The analyser supplied 153.0 seconds, 29.97 FPS, and 1920x1080, but the Studio probe is the source
-of truth for the uploaded file. The analyser timeline leaves 105.0–153.04 seconds unlabelled. Review
-that interval before treating the timeline as complete. Do not invent a final action to fill the gap.
+of truth for the uploaded file. The final interval was inspected from the video before the two
+additional records were added. The surrounding ISS hardware is not identified as MELFI without
+direct evidence.
 
-The next exact action is to select this activity in the React Studio, review the six steps and the
-unlabelled final interval, then draw and save boxes for the chosen detector classes. After labels
-are complete, add independent recording sessions before preparing the dataset and starting CUDA
-training. The current plan includes logo/title classes; either label them consistently or remove
-them from the detector plan before running the quality gate.
+The next exact action is to select this activity in the React Studio and draw and save boxes for the
+chosen detector classes. After labels are complete, add independent recording sessions before
+preparing the dataset and starting CUDA training. The current plan includes logo/title classes;
+either label them consistently or remove them from the detector plan before running the quality gate.
 
 ## 16. Documentation state
 

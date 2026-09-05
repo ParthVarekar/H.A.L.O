@@ -122,12 +122,15 @@ form so a non-programmer can confirm "yes, this is the experiment".
 ## Current activity intake
 
 The latest user-provided MELFI video is staged as a separate local activity package at
-`activities/cold_stowage_melfi/`. Its validated procedure contains six overview steps and its
+`activities/cold_stowage_melfi/`. Its validated procedure contains eight overview steps and its
 uploaded take is `studying_cells_in_space-c2dce8af89`. The Studio-probed video metadata is 153.04
-seconds, 25.0065 FPS, and 768x432. Six ground-truth timeline records are imported for 0.0–105.0
-seconds; the remaining 48.04 seconds require review before the timeline is complete. No visual
+seconds, 25.0065 FPS, and 768x432; the activity camera profile is aligned to 25 FPS and 768x432.
+Eight ground-truth timeline records now cover the complete
+0.0–153.04 seconds after inspection of the astronaut/computer segment and ESA end card. No visual
 annotations, dataset, model, evaluation report, or release has been created for this activity.
 
 The analyser's reported media metadata is not authoritative. The uploaded take probe is the source
-of truth. Contextual classes such as logos and title cards are currently present in the plan, so
-they must be labelled consistently or removed from the detector plan before the quality gate.
+of truth. The surrounding ISS hardware in the tail segment was not assigned a MELFI label without
+direct evidence. Contextual classes such as logos and title cards are currently present in the
+plan, so they must be labelled consistently or removed from the detector plan before the quality
+gate.

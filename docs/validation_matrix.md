@@ -80,10 +80,10 @@ If their description matches in order, Phase 0 is done.
 | Check | Target | Evidence | Status |
 |---|---|---|---|
 | Separate MELFI activity package | `cold_stowage_melfi` exists without changing the red/blue regression activity | React Studio activity registry and `/api/activities` | pass |
-| MELFI procedure validation | six reachable steps with valid object references | `activities/cold_stowage_melfi/plan.yaml` | pass |
+| MELFI procedure validation | eight reachable steps with valid object references | `activities/cold_stowage_melfi/plan.yaml` | pass |
 | MELFI video ingestion | uploaded take is readable and metadata is probed by the Studio | take `studying_cells_in_space-c2dce8af89`, 153.04s, 25.0065 FPS, 768x432 | pass |
-| MELFI timeline import | six records reference the generated take ID and valid step IDs | activity timeline endpoint | pass |
-| MELFI timeline coverage | records cover the complete 153.04-second take | supplied records stop at 105.0s | review required |
+| MELFI timeline import | eight records reference the generated take ID and valid step IDs | activity timeline endpoint | pass |
+| MELFI timeline coverage | records cover the complete 153.04-second take | records cover 0.0–153.04s after tail review | pass |
 | MELFI visual annotations | human boxes exist for every intended detector class | STEP 05 annotation count is 0 | pending |
 | MELFI dataset preparation | labels and session-level splits are ready | no dataset prepared yet | pending |
 | MELFI training/evaluation | CUDA training and held-out evaluation produce reports | no training job or evaluation report yet | pending |

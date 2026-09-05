@@ -314,3 +314,21 @@ Do not mark a phase complete without the corresponding tests and smoke checks. D
 **Next exact action:** select `cold_stowage_melfi` in the React Studio, review the final 48.04 seconds
 of the video and the six imported records, then draw and save boxes in STEP 05. Add independent
 recording sessions before relying on validation, evaluation, or training metrics.
+
+## Checkpoint 17: MELFI tail timeline completion
+
+**Date:** 2026-09-06
+**Status:** timeline complete; ready for visual annotation
+
+- Inspected the previously uncovered 105.0–153.04-second interval from the actual MP4.
+- Confirmed visible astronaut/computer activity from 105.0–143.04 seconds without assigning the
+  surrounding unidentified ISS hardware a false MELFI label.
+- Confirmed the ESA animation/end card from 143.04–153.04 seconds.
+- Aligned the activity camera profile to the verified take at 25 FPS and 768x432.
+- Added `astronaut_1` and `computer` object classes and `step_007`/`step_008` to the validated
+  activity plan.
+- Replaced the six-row timeline with eight records covering the full 0.0–153.04-second take.
+- No visual boxes, dataset, training job, evaluation report, or release has been created.
+
+**Next exact action:** draw and save the intended detector boxes in STEP 05. Add independent
+recording sessions before trusting validation or training metrics.
