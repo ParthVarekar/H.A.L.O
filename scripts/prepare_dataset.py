@@ -6,7 +6,7 @@ import argparse
 import json
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import cv2
 import yaml
@@ -16,6 +16,7 @@ from bas_har.perception import ColorBlockDetector
 
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
+SplitItem = TypeVar("SplitItem")
 
 
 def discover_videos(source: Path) -> list[Path]:
@@ -38,11 +39,31 @@ def discover_videos(source: Path) -> list[Path]:
 def split_videos(
     videos: list[Path], val_ratio: float, test_ratio: float, seed: int
 ) -> dict[Path, str]:
+    return _assign_splits(videos, val_ratio, test_ratio, seed)
+
+
+def split_grouped_videos(
+    videos: list[Path],
+    group_by: dict[Path, str],
+    val_ratio: float,
+    test_ratio: float,
+    seed: int,
+) -> dict[Path, str]:
+    if any(video not in group_by for video in videos):
+        raise ValueError("every video must have a recording-session group")
+    groups = sorted(set(group_by.values()))
+    group_splits = _assign_splits(groups, val_ratio, test_ratio, seed)
+    return {video: group_splits[group_by[video]] for video in videos}
+
+
+def _assign_splits(
+    items: list[SplitItem], val_ratio: float, test_ratio: float, seed: int
+) -> dict[SplitItem, str]:
     if not 0 <= val_ratio < 1 or not 0 <= test_ratio < 1:
         raise ValueError("split ratios must be between 0 and 1")
     if val_ratio + test_ratio >= 1:
         raise ValueError("val_ratio + test_ratio must be less than 1")
-    ordered = sorted(videos)
+    ordered = sorted(items)
     if len(ordered) < 3:
         return {video: "train" for video in ordered}
     shuffled = list(ordered)
@@ -125,6 +146,7 @@ def prepare(
     auto_color: bool,
     min_color_area: float,
     max_frames_per_video: int | None,
+    split_groups: dict[Path, str] | None = None,
 ) -> int:
     if sample_every < 1:
         raise ValueError("sample_every must be at least 1")
@@ -132,7 +154,11 @@ def prepare(
     data_path = dataset / "data.yaml"
     class_names = load_class_names(data_path)
     color_ids = _color_class_ids(class_names)
-    assignments = split_videos(videos, val_ratio, test_ratio, seed)
+    assignments = (
+        split_grouped_videos(videos, split_groups, val_ratio, test_ratio, seed)
+        if split_groups is not None
+        else split_videos(videos, val_ratio, test_ratio, seed)
+    )
     detector = ColorBlockDetector(color_ids, min_area=min_color_area) if auto_color else None
     manifest: list[dict[str, Any]] = []
     totals = {"train": 0, "val": 0, "test": 0}

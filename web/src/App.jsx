@@ -47,19 +47,22 @@ function App() {
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [workspace, setWorkspace] = useState("operations");
+  const [workspace, setWorkspace] = useState(() => new URLSearchParams(window.location.search).get("workspace") === "studio" ? "studio" : "operations");
+  const [operationActivities, setOperationActivities] = useState([]);
 
   const refresh = useCallback(async () => {
     try {
-      const [nextPlan, nextStatus, nextEvents] = await Promise.all([
+      const [nextPlan, nextStatus, nextEvents, nextActivities] = await Promise.all([
         readJson("/api/plan"),
         readJson("/api/status"),
         readJson("/api/events"),
+        readJson("/api/operations/activities"),
       ]);
       setPlan(nextPlan);
       setStatus(nextStatus);
       setEvents(nextEvents);
       setSource((current) => current || nextStatus.source || "");
+      setOperationActivities(nextActivities);
       setError(nextStatus.error || "");
     } catch (requestError) {
       setError(requestError.message);
@@ -119,6 +122,26 @@ function App() {
     }
   }
 
+  async function selectActivity(event) {
+    const activityId = event.target.value;
+    if (!activityId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const selected = await readJson("/api/operations/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activity_id: activityId }),
+      });
+      setPlan(selected.plan);
+      await refresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -135,6 +158,7 @@ function App() {
             <button className={workspace === "studio" ? "active" : ""} onClick={() => setWorkspace("studio")} type="button">Training Studio</button>
           </nav>
           <span className="plan-chip">{plan.id || "plan loading"}</span>
+          {operationActivities.length > 0 && <select className="operation-select" value={operationActivities.some((activity) => activity.id === plan.id) ? plan.id : ""} onChange={selectActivity} disabled={busy} aria-label="Approved activity"><option value="">Select approved activity</option>{operationActivities.map((activity) => <option key={activity.id} value={activity.id}>{activity.name}</option>)}</select>}
           <span className="connection"><span className="connection-dot" /> localhost:5767</span>
         </div>
       </header>

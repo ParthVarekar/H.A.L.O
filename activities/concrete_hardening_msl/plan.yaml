@@ -1,0 +1,162 @@
+id: concrete_hardening_msl
+name: Concrete Hardening Experiment
+version: 0.1.0
+author: local
+created: ''
+description: Prepare, mix, transfer, and finalize concrete samples inside the ISS
+  portable glovebag.
+camera:
+  source: 0
+  fps: 30
+  resolution:
+  - 1280
+  - 720
+fiducial:
+  type: none
+  family: tag36h11
+  size_mm: 120.0
+objects:
+- id: glovebag
+  classes:
+  - glovebag
+  colors_any: []
+- id: mixing_container
+  classes:
+  - container
+  colors_any: []
+- id: mixing_tool
+  classes:
+  - mixing_tool
+  colors_any: []
+- id: syringe
+  classes:
+  - syringe
+  colors_any: []
+- id: laptop
+  classes:
+  - laptop
+  colors_any: []
+- id: esa_logo
+  classes:
+  - esa_logo
+  colors_any: []
+regions: []
+region_geometries: {}
+steps:
+- id: setup_preparation
+  description: Prepare the ISS portable glovebag and internal components.
+  evidence:
+  - kind: object_visible
+    object: glovebag
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - close_up_mixing_preparation
+  timeout_s: 60.0
+  expected_duration_s: 13.0
+- id: close_up_mixing_preparation
+  description: Prepare the container and tool inside the glovebag.
+  evidence:
+  - kind: object_visible
+    object: mixing_container
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - continued_mixing
+  timeout_s: 60.0
+  expected_duration_s: 12.0
+- id: continued_mixing
+  description: Mix the sample contents using the mixing tool.
+  evidence:
+  - kind: object_visible
+    object: mixing_tool
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - mixing_with_syringe
+  timeout_s: 60.0
+  expected_duration_s: 9.0
+- id: mixing_with_syringe
+  description: Use the syringe-like tool with the container.
+  evidence:
+  - kind: object_visible
+    object: syringe
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - mixing_continues
+  timeout_s: 60.0
+  expected_duration_s: 13.0
+- id: mixing_continues
+  description: Continue mixing with the syringe and container.
+  evidence:
+  - kind: object_visible
+    object: syringe
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - detailed_mixing_transfer
+  timeout_s: 60.0
+  expected_duration_s: 9.0
+- id: detailed_mixing_transfer
+  description: Transfer material between containers using the syringe.
+  evidence:
+  - kind: object_visible
+    object: syringe
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - final_adjustments
+  timeout_s: 60.0
+  expected_duration_s: 20.0
+- id: final_adjustments
+  description: Make final adjustments to the samples and equipment.
+  evidence:
+  - kind: object_visible
+    object: glovebag
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - esa_logo_animation
+  timeout_s: 60.0
+  expected_duration_s: 17.0
+- id: esa_logo_animation
+  description: Recognize the closing ESA logo animation.
+  evidence:
+  - kind: object_visible
+    object: esa_logo
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next: []
+  timeout_s: 60.0
+  expected_duration_s: 10.0
+alert_policy:
+  skip_confidence_threshold: 0.85
+  skip_persistence_frames: 5
+  rate_limit_s: 5.0
+  silence_window_s: 60.0
+  pause_tolerance_s: 30.0

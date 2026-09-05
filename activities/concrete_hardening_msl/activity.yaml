@@ -1,0 +1,9 @@
+id: concrete_hardening_msl
+name: Concrete Hardening Experiment
+kind: experiment
+version: 0.1.0
+author: unknown
+description: Describe the glovebag concrete-mixing experiment
+plan_path: plan.yaml
+camera_profile: default
+lifecycle: imported

@@ -7,7 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from scripts.prepare_dataset import build_parser, prepare, split_videos
+from scripts.prepare_dataset import build_parser, prepare, split_grouped_videos, split_videos
 
 
 def _write_video(path: Path, frames: int = 4) -> None:
@@ -31,6 +31,20 @@ def test_split_videos_keeps_small_sources_in_train() -> None:
     videos = [Path("one.mp4"), Path("two.mp4")]
 
     assert set(split_videos(videos, 0.2, 0.1, 26174).values()) == {"train"}
+
+
+def test_grouped_split_keeps_recording_sessions_together() -> None:
+    videos = [Path("one_a.mp4"), Path("one_b.mp4"), Path("two_a.mp4"), Path("three.mp4")]
+    groups = {
+        videos[0]: "session-one",
+        videos[1]: "session-one",
+        videos[2]: "session-two",
+        videos[3]: "session-three",
+    }
+
+    assignments = split_grouped_videos(videos, groups, 0.2, 0.1, 26174)
+
+    assert assignments[videos[0]] == assignments[videos[1]]
 
 
 def test_prepare_extracts_frames_and_auto_labels(tmp_path: Path) -> None:

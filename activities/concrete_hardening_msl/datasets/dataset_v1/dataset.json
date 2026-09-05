@@ -1,0 +1,21 @@
+{
+  "id": "dataset_v1",
+  "activity_id": "concrete_hardening_msl",
+  "take_ids": [
+    "Material_Sciences_test_1-17b6df0d55"
+  ],
+  "session_ids": [
+    "msl_concrete_hardening_session_001"
+  ],
+  "train_ratio": 0.7000000000000001,
+  "validation_ratio": 0.2,
+  "test_ratio": 0.1,
+  "split_locked": true,
+  "split_sessions": {
+    "train": [
+      "msl_concrete_hardening_session_001"
+    ],
+    "val": [],
+    "test": []
+  }
+}

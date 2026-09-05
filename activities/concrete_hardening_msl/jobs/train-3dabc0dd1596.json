@@ -1,0 +1,12 @@
+{
+  "id": "train-3dabc0dd1596",
+  "activity_id": "concrete_hardening_msl",
+  "dataset_id": "dataset_v1",
+  "preset": "laptop_safe",
+  "requested_device": "auto",
+  "resolved_device": "cuda:0",
+  "status": "failed",
+  "progress": 0.05,
+  "output_path": null,
+  "error": "no validation images found under C:\\Users\\Parth\\Desktop\\HAR_for_BAS\\activities\\concrete_hardening_msl\\datasets\\dataset_v1\\images\\val; provide at least 3 videos for video-level splits"
+}

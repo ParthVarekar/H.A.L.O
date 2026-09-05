@@ -4,6 +4,13 @@
 
 The runnable MVP now spans the schema, perception, procedure, voice, React dashboard, and core I/O layers. The web service serves the React dashboard on port 5767 and runs live OpenCV capture, perception, and the procedure engine in a background session. Evidence evaluation supports polygon-backed `in_region` and `outside_of` rules. Phase 5 I/O provides RTSP/file/webcam capture, bounded MP4 segments retained by the web runner, and CRC-verified JSONL events.
 
+The React Training Studio now adds local activity-package preparation around the same contracts. It
+supports guided plan authoring, video and CSV/Excel ground truth import, browser keyframe labels,
+manual-label application to YOLO datasets, session-level split metadata, dataset quality reports,
+background training and held-out evaluation, and a checksummed human-approved release gate. The
+red/blue package remains the regression demo; complex activities are configured through their own
+validated package plans.
+
 The plan-driven color sequence recognizer has been validated on the supplied red/blue sorting video, including ordered timestamped events and CUDA device selection. The React dashboard presents frames through a continuous MJPEG endpoint while polling telemetry separately, so display cadence is independent of inference. The training workflow now accepts a folder of videos, creates video-level YOLO splits, proposes red/blue labels, provides a local drag-box labeler, and validates the dataset before CUDA-aware fine-tuning. The remaining hardware-dependent work is recording representative red/blue experiment takes, labeling them, and fine-tuning the detector. ONNX export and PyInstaller packaging are deployment steps after a trained model is available. The learned temporal head, 3D HMR, and Jetson target remain parked.
 
 ## 5 layers + 2 cross-cutters

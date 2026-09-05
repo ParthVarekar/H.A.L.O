@@ -3,9 +3,13 @@ from pathlib import Path
 from threading import Thread
 from urllib.request import Request, urlopen
 
+import cv2
+import numpy as np
+
 from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
 from bas_har.schema.cli import load_plan
 from bas_har.studio.registry import ActivityRegistry
+from bas_har.studio.takes import register_take
 from bas_har.web.server import DashboardServer, WebState, _plan_summary, _source_value
 
 
@@ -80,6 +84,10 @@ def test_activity_registry_api_creates_and_lists_activity(tmp_path: Path) -> Non
         ) as response:
             activities = json.loads(response.read().decode("utf-8"))
         assert [activity["id"] for activity in activities] == ["sample_handling"]
+        with urlopen(
+            f"http://127.0.0.1:{server.server_port}/api/operations/activities", timeout=2
+        ) as response:
+            assert json.loads(response.read().decode("utf-8")) == []
     finally:
         server.shutdown()
         server.server_close()
@@ -139,6 +147,60 @@ def test_activity_plan_api_saves_validated_plan(tmp_path: Path) -> None:
             saved = json.loads(response.read().decode("utf-8"))
         assert saved["id"] == "sample_handling"
         assert saved["name"] == "Sample Handling Procedure"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_keyframe_and_annotation_api_round_trip(tmp_path: Path) -> None:
+    plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    state = WebState(plan)
+    registry = ActivityRegistry(tmp_path)
+    registry.create(
+        ActivityManifest(id="sample_handling", name="Sample Handling", kind=ActivityKind.EXPERIMENT)
+    )
+    source = tmp_path / "take.mp4"
+    writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*"mp4v"), 5.0, (80, 60))
+    for index in range(5):
+        writer.write(np.full((60, 80, 3), index * 25, dtype=np.uint8))
+    writer.release()
+    take = register_take(registry, "sample_handling", source, source.name, "session-a")
+    server = DashboardServer(("127.0.0.1", 0), state, "models/yolo11n.pt", "cpu", registry=registry)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_port}/api/activities/sample_handling"
+        with urlopen(
+            f"{base}/keyframes?take_id={take.take_id}&every_frames=2", timeout=2
+        ) as response:
+            frames = json.loads(response.read().decode("utf-8"))
+        assert len(frames) == 3
+        with urlopen(
+            f"http://127.0.0.1:{server.server_port}{frames[1]['image_url']}", timeout=2
+        ) as response:
+            assert response.headers["Content-Type"] == "image/jpeg"
+            assert len(response.read()) > 100
+        payload = {
+            "id": "box-frame-2",
+            "take_id": take.take_id,
+            "frame_id": 2,
+            "time_s": 0.4,
+            "kind": "object_box",
+            "label": "red_block",
+            "bbox": {"x1": 5, "y1": 5, "x2": 30, "y2": 30},
+        }
+        request = Request(
+            f"{base}/annotations",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request, timeout=2) as response:
+            assert response.status == 201
+        with urlopen(f"{base}/annotations?take_id={take.take_id}", timeout=2) as response:
+            annotations = json.loads(response.read().decode("utf-8"))
+        assert annotations[0]["label"] == "red_block"
     finally:
         server.shutdown()
         server.server_close()

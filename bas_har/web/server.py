@@ -20,14 +20,40 @@ from pydantic import TypeAdapter, ValidationError
 
 from bas_har.config import logs_dir, project_root
 from bas_har.procedure import ColorSequenceTracker, ProcedureEngine, build_engine
-from bas_har.schema.activity_schema import ActivityId, ActivityManifest
+from bas_har.schema.activity_schema import (
+    ActivityId,
+    ActivityLifecycle,
+    ActivityManifest,
+    JobStatus,
+    RecordId,
+    ReleaseStatus,
+    TrainingPreset,
+)
 from bas_har.schema.cli import load_plan
 from bas_har.schema.event_schema import EventRecord
 from bas_har.schema.plan_schema import ExperimentPlan
-from bas_har.studio.registry import ActivityRegistry
+from bas_har.studio.annotations import (
+    list_annotations,
+    list_keyframes,
+    read_take_frame,
+    save_annotation,
+)
+from bas_har.studio.datasets import activity_dataset_dir, load_dataset_version
+from bas_har.studio.evaluation import EvaluationJobManager, evaluation_csv, load_evaluation_report
+from bas_har.studio.hardware import hardware_snapshot
+from bas_har.studio.jobs import DatasetJobManager, TrainingJobManager
 from bas_har.studio.plans import load_activity_plan, save_activity_plan
+from bas_har.studio.quality import inspect_dataset, load_quality_report
+from bas_har.studio.registry import ActivityRegistry
+from bas_har.studio.releases import (
+    activate_release,
+    approve_release,
+    create_candidate,
+    list_releases,
+)
 from bas_har.studio.takes import list_takes, register_take
 from bas_har.studio.timeline import import_timeline, list_timeline
+from bas_har.studio.verification import release_audit_csv, verify_activity_package
 from bas_har.voice import ConfirmationSound
 
 STATIC_DIR = project_root() / "web" / "dist"
@@ -270,6 +296,38 @@ class WebState:
         with self.lock:
             self.runner = runner
 
+    def replace_plan(self, plan: ExperimentPlan) -> None:
+        first = plan.steps[0]
+        with self.lock:
+            self.plan = plan
+            self.plan_data = _plan_summary(plan)
+            self.frame_jpeg = None
+            self.events.clear()
+            self.status.update(
+                running=False,
+                source=str(plan.camera.source),
+                frame_id=-1,
+                fps=0.0,
+                state="in_progress",
+                current_step_id=first.id,
+                current_step_description=first.description,
+                next_step_id=first.next[0] if first.next else None,
+                confidence=0.0,
+                pause_active=False,
+                in_cooldown=False,
+                detections=[],
+                last_event=None,
+                message="Activity package selected",
+                error=None,
+                log_path=None,
+                buffer_dir=None,
+                buffer_segment_count=0,
+                device=None,
+                recognizer=None,
+                has_frame=False,
+                started_at=None,
+            )
+
     def set_frame(self, frame_jpeg: bytes, frame_id: int) -> None:
         with self.lock:
             self.frame_jpeg = frame_jpeg
@@ -489,6 +547,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/health":
             self._send_json({"ok": True, "service": "bas-har-web"})
             return
+        if parsed.path == "/api/hardware":
+            self._send_json(hardware_snapshot())
+            return
         if parsed.path == "/api/status":
             self._send_json(self.server.state.snapshot())
             return
@@ -504,6 +565,72 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
                     for manifest in self.server.registry.list_activities()
                 ]
+            )
+            return
+        if parsed.path == "/api/operations/activities":
+            approved = [
+                manifest
+                for manifest in self.server.registry.list_activities()
+                if manifest.lifecycle in {ActivityLifecycle.APPROVED, ActivityLifecycle.ACTIVE}
+            ]
+            self._send_json(
+                [
+                    manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
+                    for manifest in approved
+                ]
+            )
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/keyframes"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/keyframes"))
+                query = urllib.parse.parse_qs(parsed.query)
+                take_id = self._record_id(query.get("take_id", [""])[0])
+                every_frames = int(query.get("every_frames", [30])[0])
+                limit = int(query.get("limit", [120])[0])
+                frames = list_keyframes(
+                    self.server.registry, activity_id, take_id, every_frames, limit
+                )
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+                return
+            for frame in frames:
+                frame["image_url"] = (
+                    f"/api/activities/{urllib.parse.quote(str(activity_id))}/takes/"
+                    f"{urllib.parse.quote(str(take_id))}/frames/{frame['frame_id']}.jpg"
+                )
+            self._send_json(frames)
+            return
+        frame_parts = parsed.path.strip("/").split("/")
+        if (
+            len(frame_parts) == 7
+            and frame_parts[0] == "api"
+            and frame_parts[1] == "activities"
+            and frame_parts[3] == "takes"
+            and frame_parts[5] == "frames"
+            and frame_parts[6].lower().endswith(".jpg")
+        ):
+            try:
+                activity_id = self._activity_id(f"/api/activities/{frame_parts[2]}")
+                take_id = self._record_id(frame_parts[4])
+                frame_id = int(Path(frame_parts[6]).stem)
+                frame = read_take_frame(self.server.registry, activity_id, take_id, frame_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_bytes(frame, "image/jpeg")
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/annotations"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/annotations"))
+                query = urllib.parse.parse_qs(parsed.query)
+                raw_take_id = query.get("take_id", [None])[0]
+                take_id = self._record_id(raw_take_id) if raw_take_id else None
+                annotations = list_annotations(self.server.registry, activity_id, take_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(
+                [annotation.model_dump(mode="json", by_alias=True) for annotation in annotations]
             )
             return
         if parsed.path.count("/") == 4 and parsed.path.endswith("/takes"):
@@ -553,6 +680,117 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(plan.model_dump(mode="json", by_alias=True))
             return
+        if parsed.path.count("/") == 5 and parsed.path.endswith("/dataset/jobs"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/dataset/jobs"))
+                jobs = self.server.dataset_jobs.list(activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json([job.model_dump(mode="json", by_alias=True) for job in jobs])
+            return
+        if parsed.path.count("/") == 5 and parsed.path.endswith("/training/jobs"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/training/jobs"))
+                jobs = self.server.training_jobs.list(activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json([job.model_dump(mode="json", by_alias=True) for job in jobs])
+            return
+        if parsed.path.count("/") == 5 and parsed.path.endswith("/evaluation/jobs"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/evaluation/jobs"))
+                jobs = self.server.evaluation_jobs.list(activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json([job.model_dump(mode="json", by_alias=True) for job in jobs])
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/releases"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/releases"))
+                releases = list_releases(self.server.registry, activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(
+                [release.model_dump(mode="json", by_alias=True) for release in releases]
+            )
+            return
+        if parsed.path.count("/") == 5 and parsed.path.endswith("/releases/audit.csv"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/releases/audit.csv"))
+                audit = release_audit_csv(self.server.registry, activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_bytes(audit, "text/csv; charset=utf-8", "release-audit.csv")
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/verification"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/verification"))
+                verification = verify_activity_package(self.server.registry, activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(verification.model_dump(mode="json", by_alias=True))
+            return
+        if parsed.path == "/api/operations/select":
+            try:
+                payload = self._read_json()
+                self._select_activity(payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path.count("/") == 5 and parsed.path.endswith("/dataset/quality"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/dataset/quality"))
+                report = load_quality_report(self.server.registry, activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(report.model_dump(mode="json", by_alias=True))
+            return
+        report_parts = parsed.path.strip("/").split("/")
+        if (
+            len(report_parts) == 6
+            and report_parts[:4] == ["api", "activities", report_parts[2], "evaluation"]
+            and report_parts[4] == "reports"
+        ):
+            try:
+                activity_id = self._activity_id(f"/api/activities/{report_parts[2]}")
+                report_id = (
+                    Path(report_parts[5]).stem
+                    if report_parts[5].lower().endswith(".csv")
+                    else report_parts[5]
+                )
+                report = load_evaluation_report(self.server.registry, activity_id, report_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            if report_parts[5].lower().endswith(".csv"):
+                self._send_bytes(
+                    evaluation_csv(report), "text/csv; charset=utf-8", "evaluation.csv"
+                )
+                return
+            self._send_json(report.model_dump(mode="json", by_alias=True))
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/dataset"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/dataset"))
+                dataset = load_dataset_version(self.server.registry, activity_id)
+                data_path = activity_dataset_dir(self.server.registry, activity_id) / "data.yaml"
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(
+                {
+                    "dataset": dataset.model_dump(mode="json", by_alias=True),
+                    "data_path": str(data_path),
+                }
+            )
+            return
         if parsed.path.startswith("/api/activities/"):
             try:
                 activity_id = self._activity_id(parsed.path)
@@ -577,6 +815,64 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if parsed.path.count("/") == 4 and parsed.path.endswith("/timeline"):
             self._upload_timeline(parsed.path.removesuffix("/timeline"))
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/annotations"):
+            try:
+                payload = self._read_json()
+                self._save_annotation(parsed.path.removesuffix("/annotations"), payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/releases"):
+            try:
+                payload = self._read_json()
+                self._create_release(parsed.path.removesuffix("/releases"), payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        release_parts = parsed.path.strip("/").split("/")
+        if (
+            len(release_parts) == 6
+            and release_parts[0] == "api"
+            and release_parts[1] == "activities"
+            and release_parts[3] == "releases"
+            and release_parts[5] in {"approve", "activate"}
+        ):
+            try:
+                payload = self._read_json()
+                self._update_release(release_parts, payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path.count("/") == 5 and parsed.path.endswith("/dataset/prepare"):
+            try:
+                payload = self._read_json()
+                self._start_dataset(parsed.path.removesuffix("/dataset/prepare"), payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path.count("/") == 6 and parsed.path.endswith("/dataset/quality/check"):
+            try:
+                activity_id = self._activity_id(parsed.path.removesuffix("/dataset/quality/check"))
+                report = inspect_dataset(self.server.registry, activity_id)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+                return
+            self._send_json(report.model_dump(mode="json", by_alias=True), HTTPStatus.OK)
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/evaluation"):
+            try:
+                payload = self._read_json()
+                self._start_evaluation(parsed.path.removesuffix("/evaluation"), payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path.count("/") == 4 and parsed.path.endswith("/training"):
+            try:
+                payload = self._read_json()
+                self._start_training(parsed.path.removesuffix("/training"), payload)
+            except (FileNotFoundError, ValueError, ValidationError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
         if parsed.path not in {"/api/activities", "/api/start", "/api/stop", "/api/silence"}:
             self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
@@ -614,6 +910,125 @@ class DashboardHandler(BaseHTTPRequestHandler):
         plan = ExperimentPlan.model_validate(payload)
         saved = save_activity_plan(self.server.registry, activity_id, plan)
         self._send_json(saved.model_dump(mode="json", by_alias=True), HTTPStatus.OK)
+
+    def _save_annotation(self, activity_path: str, payload: dict[str, Any]) -> None:
+        activity_id = self._activity_id(activity_path)
+        annotation = save_annotation(self.server.registry, activity_id, payload)
+        self._send_json(annotation.model_dump(mode="json", by_alias=True), HTTPStatus.CREATED)
+
+    def _create_release(self, activity_path: str, payload: dict[str, Any]) -> None:
+        activity_id = self._activity_id(activity_path)
+        report_id = str(payload.get("evaluation_report_id", "")).strip()
+        model_path = str(payload.get("model_path", "")).strip()
+        version = str(payload.get("version", "")).strip()
+        if not report_id or not model_path or not version:
+            raise ValueError("evaluation_report_id, model_path, and version are required")
+        release = create_candidate(
+            self.server.registry, activity_id, report_id, model_path, version
+        )
+        self._send_json(release.model_dump(mode="json", by_alias=True), HTTPStatus.CREATED)
+
+    def _select_activity(self, payload: dict[str, Any]) -> None:
+        activity_id = TypeAdapter(ActivityId).validate_python(str(payload.get("activity_id", "")))
+        runner = self.server.state.get_runner()
+        if runner is not None and runner.is_alive():
+            raise ValueError("stop capture before selecting another activity")
+        manifest = self.server.registry.load(activity_id)
+        if manifest.lifecycle not in {ActivityLifecycle.APPROVED, ActivityLifecycle.ACTIVE}:
+            raise ValueError("only an approved or active activity can be selected")
+        releases = [
+            release
+            for release in list_releases(self.server.registry, activity_id)
+            if release.status in {ReleaseStatus.APPROVED, ReleaseStatus.ACTIVE}
+        ]
+        if not releases:
+            raise ValueError("activity has no approved release")
+        release = next(
+            (
+                candidate
+                for candidate in releases
+                if candidate.release_id == manifest.active_release_id
+            ),
+            releases[-1],
+        )
+        plan = load_activity_plan(self.server.registry, activity_id)
+        model_path = self.server.registry.package_dir(activity_id) / release.model_path
+        if not model_path.is_file():
+            raise FileNotFoundError(f"release model not found: {model_path}")
+        verification = verify_activity_package(
+            self.server.registry, activity_id, release.release_id
+        )
+        if not verification.passed:
+            raise ValueError("activity package verification failed")
+        self.server.yolo_model = str(model_path)
+        self.server.state.replace_plan(plan)
+        self._send_json(
+            {
+                "activity": manifest.model_dump(mode="json", by_alias=True),
+                "release": release.model_dump(mode="json", by_alias=True),
+                "plan": _plan_summary(plan),
+            },
+            HTTPStatus.OK,
+        )
+
+    def _update_release(self, parts: list[str], payload: dict[str, Any]) -> None:
+        activity_path = f"/api/activities/{parts[2]}"
+        activity_id = self._activity_id(activity_path)
+        release_id = self._record_id(parts[4])
+        if parts[5] == "approve":
+            release = approve_release(
+                self.server.registry, activity_id, release_id, str(payload.get("reviewer", ""))
+            )
+        else:
+            release = activate_release(self.server.registry, activity_id, release_id)
+        self._send_json(release.model_dump(mode="json", by_alias=True), HTTPStatus.OK)
+
+    def _start_dataset(self, activity_path: str, payload: dict[str, Any]) -> None:
+        activity_id = self._activity_id(activity_path)
+        job = self.server.dataset_jobs.start(
+            activity_id,
+            sample_every=int(payload.get("sample_every", 5)),
+            val_ratio=float(payload.get("val_ratio", 0.2)),
+            test_ratio=float(payload.get("test_ratio", 0.1)),
+        )
+        self._send_json(job.model_dump(mode="json", by_alias=True), HTTPStatus.ACCEPTED)
+
+    def _start_training(self, activity_path: str, payload: dict[str, Any]) -> None:
+        activity_id = self._activity_id(activity_path)
+        dataset = load_dataset_version(self.server.registry, activity_id)
+        preset = TrainingPreset(payload.get("preset", TrainingPreset.LAPTOP_SAFE.value))
+        job = self.server.training_jobs.start(
+            activity_id,
+            dataset.dataset_id,
+            preset=preset,
+            requested_device=str(payload.get("device", "auto")),
+            model_path=str(payload.get("model", self.server.yolo_model)),
+        )
+        self._send_json(job.model_dump(mode="json", by_alias=True), HTTPStatus.ACCEPTED)
+
+    def _start_evaluation(self, activity_path: str, payload: dict[str, Any]) -> None:
+        activity_id = self._activity_id(activity_path)
+        training_job_id = str(payload.get("training_job_id", "")).strip()
+        model_path = str(payload.get("model", "")).strip()
+        if not training_job_id or not model_path:
+            completed = [
+                job
+                for job in self.server.training_jobs.list(activity_id)
+                if job.status is JobStatus.COMPLETED and job.output_path
+            ]
+            if not completed:
+                raise ValueError("select a completed training job before evaluation")
+            selected = completed[-1]
+            training_job_id = selected.job_id
+            model_path = selected.output_path or ""
+        job = self.server.evaluation_jobs.start(
+            activity_id,
+            training_job_id,
+            model_path,
+            requested_device=str(payload.get("device", "auto")),
+            iou_threshold=float(payload.get("iou_threshold", 0.5)),
+        )
+        self._send_json(job.model_dump(mode="json", by_alias=True), HTTPStatus.ACCEPTED)
 
     def _upload_take(self, activity_path: str) -> None:
         try:
@@ -719,6 +1134,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         value = urllib.parse.unquote(parts[2])
         return TypeAdapter(ActivityId).validate_python(value)
 
+    @staticmethod
+    def _record_id(value: str) -> RecordId:
+        if not value:
+            raise ValueError("record id is required")
+        return TypeAdapter(RecordId).validate_python(urllib.parse.unquote(value))
+
     def _start(self, payload: dict[str, Any]) -> None:
         existing = self.server.state.get_runner()
         if existing is not None and existing.is_alive():
@@ -772,12 +1193,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if frame is None:
             self._send_json({"error": "no frame available"}, HTTPStatus.NOT_FOUND)
             return
+        self._send_bytes(frame, "image/jpeg")
+
+    def _send_bytes(self, data: bytes, content_type: str, download_name: str | None = None) -> None:
         self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(frame)))
+        if download_name is not None:
+            self.send_header("Content-Disposition", f'attachment; filename="{download_name}"')
+        self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(frame)
+        self.wfile.write(data)
 
     def _send_stream(self) -> None:
         self.send_response(HTTPStatus.OK)
@@ -855,6 +1281,9 @@ class DashboardServer(ThreadingHTTPServer):
         self.yolo_model = yolo_model
         self.device = device
         self.registry = registry or ActivityRegistry()
+        self.dataset_jobs = DatasetJobManager(self.registry)
+        self.training_jobs = TrainingJobManager(self.registry)
+        self.evaluation_jobs = EvaluationJobManager(self.registry)
 
 
 def main(argv: list[str] | None = None) -> int:

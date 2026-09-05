@@ -167,6 +167,7 @@ class DatasetVersion(StrictModel):
     validation_ratio: float = Field(default=0.2, gt=0, lt=1)
     test_ratio: float = Field(default=0.1, gt=0, lt=1)
     split_locked: bool = True
+    split_sessions: dict[str, list[RecordId]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_ratios(self) -> DatasetVersion:
@@ -182,10 +183,49 @@ class TrainingJob(StrictModel):
     dataset_id: RecordId
     preset: TrainingPreset = TrainingPreset.LAPTOP_SAFE
     requested_device: str = Field(default="auto", min_length=1, max_length=32)
+    resolved_device: str | None = Field(default=None, max_length=32)
     status: JobStatus = JobStatus.QUEUED
     progress: float = Field(default=0.0, ge=0, le=1)
     output_path: str | None = None
     error: str | None = None
+
+
+class DatasetPreparationJob(StrictModel):
+    job_id: RecordId = Field(alias="id")
+    activity_id: ActivityId
+    status: JobStatus = JobStatus.QUEUED
+    progress: float = Field(default=0.0, ge=0, le=1)
+    dataset_id: RecordId | None = None
+    error: str | None = None
+
+
+class EvaluationJob(StrictModel):
+    job_id: RecordId = Field(alias="id")
+    activity_id: ActivityId
+    training_job_id: RecordId
+    model_path: str = Field(min_length=1, max_length=500)
+    requested_device: str = Field(default="auto", min_length=1, max_length=32)
+    resolved_device: str | None = Field(default=None, max_length=32)
+    iou_threshold: float = Field(default=0.5, gt=0, lt=1)
+    status: JobStatus = JobStatus.QUEUED
+    progress: float = Field(default=0.0, ge=0, le=1)
+    report_id: RecordId | None = None
+    error: str | None = None
+
+
+class DatasetQualityReport(StrictModel):
+    report_id: RecordId = Field(alias="id")
+    activity_id: ActivityId
+    dataset_id: RecordId
+    passed: bool
+    images_by_split: dict[str, int] = Field(default_factory=dict)
+    label_files_by_split: dict[str, int] = Field(default_factory=dict)
+    empty_label_images: list[str] = Field(default_factory=list)
+    missing_label_files: list[str] = Field(default_factory=list)
+    invalid_label_files: list[str] = Field(default_factory=list)
+    class_counts: dict[str, int] = Field(default_factory=dict)
+    sessions_by_split: dict[str, list[RecordId]] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class EvaluationReport(StrictModel):
@@ -199,6 +239,7 @@ class EvaluationReport(StrictModel):
     device: str = Field(default="unknown", min_length=1, max_length=32)
     inference_fps: float | None = Field(default=None, ge=0)
     timestamp_tolerance_s: float = Field(default=2.0, gt=0)
+    failure_gallery: list[dict[str, str | float]] = Field(default_factory=list)
 
 
 class ModelRelease(StrictModel):
@@ -214,6 +255,15 @@ class ModelRelease(StrictModel):
     approved_by: str | None = Field(default=None, max_length=120)
 
 
+class PackageVerification(StrictModel):
+    verification_id: RecordId = Field(alias="id")
+    activity_id: ActivityId
+    release_id: RecordId | None = None
+    passed: bool
+    checks: dict[str, bool] = Field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+
+
 __all__ = [
     "ActivityId",
     "ActivityKind",
@@ -221,11 +271,15 @@ __all__ = [
     "ActivityManifest",
     "AnnotationKind",
     "BoundingBox",
+    "DatasetPreparationJob",
+    "DatasetQualityReport",
     "DatasetVersion",
+    "EvaluationJob",
     "EvaluationReport",
     "GroundTruthStatus",
     "JobStatus",
     "ModelRelease",
+    "PackageVerification",
     "RecordId",
     "ReleaseStatus",
     "TakeRecord",

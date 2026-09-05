@@ -1,0 +1,11 @@
+path: .
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: glovebag
+  1: container
+  2: mixing_tool
+  3: syringe
+  4: laptop
+  5: esa_logo

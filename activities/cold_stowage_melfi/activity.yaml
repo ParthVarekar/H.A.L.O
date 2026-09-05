@@ -1,0 +1,10 @@
+id: cold_stowage_melfi
+name: Cold Stowage and MELFI Operations
+kind: experiment
+version: 0.1.0
+author: local
+description: A video-grounded procedure package for Cold Stowage and MELFI-related
+  sample-storage operations.
+plan_path: plan.yaml
+camera_profile: default
+lifecycle: imported

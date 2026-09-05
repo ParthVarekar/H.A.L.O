@@ -4,7 +4,7 @@
 **Authoritative spec**: `docs/SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx` (in `C:\Users\Parth\Downloads`)
 **Mission**: SIH26174 — AI HAR for on-board BAS experiments (ISRO, Gaganyaan/BAS-01 2028).
 **Branch you'll be picked up from**: main.
-**Last verified state**: 81 pytest passing, `ruff check` and formatting clean, React dashboard smoke passes, SIH PDF rendered and visually checked.
+**Last verified state**: 115 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass, SIH PDF rendered and visually checked.
 
 ---
 
@@ -69,7 +69,7 @@ cmd /c startup.bat live 0
 | 6 — SIH idea submission docs | done | `output/pdf/SIH26174_AI_HAR_BAS_submission.pdf` |
 | 7 — Packaging (ONNX export + PyInstaller) | partial | `train-yolo`, `prepare-yolo-dataset`, `annotate-yolo`, and `export-onnx` CLIs are ready; the React PyInstaller bundle is verified, while a trained model bundle remains |
 
-**81 pytest passing.** `ruff check` and `ruff format` both clean.
+**115 pytest passing.** `ruff check` and `ruff format --check` both clean. The React build and web smoke pass.
 
 The supplied video `Man_sorting_blocks_in_box_202609030054.mp4` is accepted by the plan-driven color sequence recognizer. It completes all six expected steps with events at 0.791s, 1.916s, 3.333s, 4.458s, 5.458s, and 6.875s. The run uses `cuda:0` for the YOLO path and writes a CRC-verified JSONL event log.
 
@@ -164,7 +164,10 @@ tests/
   test_web.py                    (3 tests — web service surface and MJPEG stream)
 ```
 
-Total: 81 tests. All passing as of this handover.
+Total: 115 tests. All passing as of this handover. The continuation adds coverage in
+`test_activity_schema.py`, `test_activity_registry.py`, `test_annotations.py`, `test_datasets.py`,
+`test_evaluation.py`, `test_jobs.py`, `test_quality.py`, `test_releases.py`, `test_takes.py`,
+`test_timeline.py`, and `test_web.py`.
 
 ---
 
@@ -231,15 +234,25 @@ The older phase and issue notes above are historical. The following items are no
 - The red/blue plan contains table geometry and the restored placement, location, and visibility rules.
 - Phase 5 I/O covers webcam, file, and RTSP capture, rotating MP4 segments in the web runner, and CRC-verified JSONL events.
 - `prepare-yolo-dataset` extracts sampled video frames, performs deterministic video-level splits, and proposes red/blue labels; `annotate-yolo` is a local drag-box labeler; `train-yolo` selects CUDA automatically and validates dataset completeness before training; `export-onnx` exports the trained model.
+- The React Training Studio creates local activity packages, imports videos and CSV/Excel timelines,
+  reviews sampled keyframes with drag-box labels, runs dataset quality checks, and persists split
+  session membership.
+- Manual browser labels are applied to YOLO data, including frames outside the automatic sample
+  interval. Held-out evaluation produces metrics and a failure gallery; passed reports can create
+  checksummed candidates that require explicit reviewer approval before activation.
+- Activity dataset preparation assigns whole recording sessions, not individual videos, to splits;
+  this prevents session leakage in the normal Training Studio workflow.
 - `packaging/bas_har_gui.spec` builds the React server executable; `dist/bas-har-web.exe` has passed packaged HTTP health and static-page checks.
-- The test suite currently passes 81 tests and Ruff plus formatting are clean.
+- The test suite currently passes 115 tests and Ruff plus formatting are clean.
 - The dashboard video feed uses `/api/stream.mjpg` for continuous frames while telemetry remains independently polled.
 - The plan-driven color sequence recognizer accepts the supplied red/blue sorting video and emits six CRC-verified timed events. The verified run uses `cuda:0` at 42.5 FPS.
 - Each successful step emits one asynchronous confirmation ping through the Windows audio device; the confirmation worker shuts down with the capture session.
 - `startup.bat analyze "C:\Users\Parth\Downloads\Man_sorting_blocks_in_box_202609030054.mp4"` runs the full checks and sequence acceptance test.
 - The system `py -3.11` launcher was unusable on this machine; the current `.venv` was created from the installed uv-managed CPython 3.11.9 runtime.
 
-The next safe work is collecting representative red/blue camera takes, completing labels with `annotate-yolo`, running CUDA fine-tuning, and then exporting the trained model for deployment packaging. 3D HMR, Jetson, and learned temporal modeling remain parked by decision.
+The next safe work is using the Training Studio to collect representative takes, complete browser
+labels, run CUDA fine-tuning, evaluate held-out sessions, and approve a release. 3D HMR, Jetson,
+and learned temporal modeling remain parked by decision.
 
 ## 13. React dashboard continuation
 
@@ -262,8 +275,53 @@ create a validated YAML procedure with a guided builder, drag in videos, import 
 or CSV ground truth, review AI-assisted visual labels, train on the laptop RTX 5050, evaluate on
 unseen session-level test videos, and manually approve a release before Operations can use it.
 
-The next implementation starts with schema-first activity/package contracts and registry plumbing,
-then browser import and annotation, background training/evaluation, release approval, and generic
-runtime integration. The red/blue tracker remains a regression adapter only. `object_state` must
-be implemented before activities depending on it can be approved. 3D HMR, Jetson, and the learned
-temporal head remain parked.
+Schema-first activity/package contracts, registry plumbing, browser import, annotation, background
+training/evaluation, and the manual release gate are implemented and covered in
+`docs/progress_log.md` Checkpoints 1–6. Package verification and approved activity selection are now
+also implemented. The next implementation is offline/replay hardening and generic package evidence
+adapters. The red/blue tracker remains a regression adapter only. `object_state` must be implemented
+before activities depending on it can be approved. 3D HMR, Jetson, and the learned temporal head
+remain parked.
+
+The user-provided activity package has since been recreated through Training Studio and staged for
+annotation. Its procedure and eight-row timeline are saved, the take is uploaded, the dataset is
+prepared, and the full-video keyframe reviewer is open. The next action is drawing detector boxes;
+training remains blocked until labels and independent recording sessions satisfy the quality gate.
+
+During this intake, a stale-file race in the background training and evaluation job listings was
+fixed: durable queued records can no longer overwrite a newer in-memory running or failed state.
+The full `startup.bat test` gate and React production build pass after the fix.
+
+The STEP 05 annotation keyframe strip was replaced with a compact frame dropdown. Each option shows
+its timestamp and saved-label count, and selecting a frame loads it without horizontal scrolling.
+The default sampling interval is 30 frames so the current 103-second take remains fully selectable
+after refresh. The current package remains staged for annotation; the next exact action is drawing
+and saving detector boxes for the visible classes.
+
+Saving a STEP 05 box now automatically loads the next frame. When a draft box is present, pressing
+`Enter` performs the same save-and-advance action; the annotation image takes focus when drawing so
+the shortcut works immediately after choosing a label. The button and status text show this shortcut.
+Frame dropdown navigation now normalizes backend numeric IDs against HTML select string values and
+keeps frame zero visibly selected, so moving forward or backward no longer clears the annotation
+editor.
+
+This fix was live-verified by navigating from 0.00s to 1.20s and back to 0.00s. Existing saved
+annotations were not changed.
+
+STEP 05 frame options now use a high-contrast dark color scheme with readable text and a distinct
+selected state to prevent the native dropdown from appearing washed out.
+
+The current concrete-hardening take has been audited and its dataset regenerated: 87/87 sampled
+keyframes have valid, non-duplicate boxes and all six planned classes are represented. The quality
+gate is FIX only because there is one recording session, so all 517 images are in train and val/test
+are empty. Add at least two independent sessions, annotate them, regenerate `dataset_v1`, and rerun
+the quality gate before treating training or evaluation as reliable.
+
+The current training result is not a model: two CUDA-resolved laptop-safe attempts stopped at 5%
+because no validation images existed. No weights or evaluation report were produced. Do not report
+this as successful training. If a one-video prototype is desired, it requires an explicit frame-level
+split mode and its metrics must be labeled as leakage-prone.
+
+The prior visual annotations were intentionally cleared on 2026-09-06 at the user's request. The
+activity plan, uploaded video, recording session, and all eight ground-truth timeline rows were
+verified as preserved. The Training Studio view was reset and is ready to annotate from frame one.

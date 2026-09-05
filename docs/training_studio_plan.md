@@ -61,6 +61,8 @@ model, dataset, camera profile, evaluation report, configuration, and checksums.
 activities/<activity-id>/
   activity.yaml
   plan.yaml
+  takes.jsonl
+  annotations.jsonl
   camera_profiles/
   takes/
   datasets/

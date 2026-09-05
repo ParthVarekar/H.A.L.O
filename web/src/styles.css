@@ -38,6 +38,7 @@ h2 { margin-top: 7px; font-size: 17px; letter-spacing: -0.02em; }
 .workspace-nav button.active { color: #04140f; background: var(--green); }
 .plan-chip, .connection, .state-badge, .step-count, .telemetry-live, .event-count { font-family: "DM Mono", monospace; font-size: 11px; }
 .plan-chip { padding: 9px 12px; color: var(--soft); border: 1px solid var(--line); border-radius: 7px; background: rgba(255, 255, 255, 0.03); }
+.operation-select { max-width: 190px; padding: 8px 10px; color: var(--soft); border: 1px solid var(--line); border-radius: 7px; outline: none; background: rgba(255, 255, 255, 0.03); font-family: "DM Mono", monospace; font-size: 10px; }
 .connection { color: var(--soft); }
 .connection-dot, .rec-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(68, 216, 163, 0.1); }
 .hero-grid, .lower-grid { display: grid; grid-template-columns: minmax(0, 1.72fr) minmax(310px, 0.78fr); gap: 18px; }
@@ -130,6 +131,20 @@ h2 { margin-top: 7px; font-size: 17px; letter-spacing: -0.02em; }
 .activity-next p { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .studio-next-stack { display: grid; gap: 18px; }
 .upload-block { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.procedure-block { margin-top: 0; padding-top: 0; border-top: 0; }
+.procedure-fields { display: grid; gap: 12px; margin-top: 17px; }
+.procedure-fields label { display: grid; gap: 7px; color: var(--muted); font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.procedure-fields input, .procedure-fields textarea, .builder-row input, .builder-row select { width: 100%; min-width: 0; padding: 9px 10px; color: var(--soft); border: 1px solid var(--line); border-radius: 7px; outline: none; background: rgba(0, 0, 0, 0.18); font-family: "Manrope", Arial, sans-serif; font-size: 11px; letter-spacing: normal; text-transform: none; }
+.procedure-fields textarea { resize: vertical; }
+.builder-heading { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+.text-button { padding: 0; color: var(--green); border: 0; background: transparent; font-family: "DM Mono", monospace; font-size: 10px; }
+.builder-row { display: grid; grid-template-columns: 0.8fr 1.2fr 1fr; gap: 7px; margin-top: 8px; }
+.object-builder-row { grid-template-columns: 0.8fr 1.2fr 1fr auto; }
+.step-builder { padding: 10px 0 12px; border-bottom: 1px solid var(--line); }
+.step-header-row { grid-template-columns: 0.8fr 1.2fr auto; }
+.builder-row-small { grid-template-columns: 0.6fr 0.8fr 1.6fr; }
+.remove-button { align-self: stretch; padding: 0 9px; color: var(--red); border: 1px solid rgba(255, 124, 131, 0.3); border-radius: 6px; background: rgba(255, 124, 131, 0.06); font-family: "DM Mono", monospace; font-size: 9px; text-transform: uppercase; }
+.remove-button:hover { border-color: rgba(255, 124, 131, 0.65); background: rgba(255, 124, 131, 0.12); }
 .session-field { display: grid; gap: 7px; margin-top: 18px; color: var(--muted); font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .session-field input { width: 100%; margin-top: 0; padding: 10px 12px; color: var(--soft); border: 1px solid var(--line); border-radius: 7px; outline: none; background: rgba(0, 0, 0, 0.18); font-family: "Manrope", Arial, sans-serif; font-size: 12px; letter-spacing: normal; text-transform: none; }
 .upload-zone { display: grid; place-items: center; gap: 7px; min-height: 120px; margin-top: 13px; padding: 18px; border: 1px dashed rgba(68, 216, 163, 0.5); border-radius: 9px; background: rgba(68, 216, 163, 0.05); color: var(--soft); text-align: center; }
@@ -155,13 +170,47 @@ h2 { margin-top: 7px; font-size: 17px; letter-spacing: -0.02em; }
 .ground-truth-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .ground-truth-row em { color: var(--green); font-family: "DM Mono", monospace; font-size: 9px; font-style: normal; text-transform: uppercase; }
 .more-label { color: var(--muted); font-size: 10px; }
+.training-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.job-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin-top: 18px; }
+.job-status-grid div { min-width: 0; }
+.job-status-grid span { color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.job-status-grid strong { display: block; margin-top: 5px; overflow: hidden; color: var(--soft); font-family: "DM Mono", monospace; font-size: 10px; text-overflow: ellipsis; text-transform: capitalize; white-space: nowrap; }
 .success-banner { margin-top: 12px; padding: 10px 12px; color: #caffeb; border: 1px solid rgba(68, 216, 163, 0.3); border-radius: 7px; background: rgba(68, 216, 163, 0.1); font-size: 12px; }
+.warning-banner { margin-top: 8px; padding: 9px 11px; color: #ffe7b0; border: 1px solid rgba(255, 196, 92, 0.28); border-radius: 7px; background: rgba(255, 196, 92, 0.08); font-size: 11px; line-height: 1.5; }
+.step-count.passed { color: var(--green); }
+.annotation-controls { display: grid; grid-template-columns: 1.35fr 0.75fr 1fr 1.1fr; gap: 8px; margin-top: 14px; }
+.annotation-controls label { display: grid; gap: 6px; color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.annotation-controls input, .annotation-controls select { width: 100%; padding: 9px 10px; color: var(--soft); border: 1px solid var(--line); border-radius: 7px; outline: none; background: rgba(0, 0, 0, 0.18); font-family: "Manrope", Arial, sans-serif; font-size: 11px; letter-spacing: normal; text-transform: none; }
+.annotation-controls select { color-scheme: dark; }
+.annotation-controls select option { color: #f2f6fb; background: #0c1a2b; }
+.annotation-controls select option:checked { color: #04140f; background: var(--green); }
+.annotation-controls select option:disabled { color: var(--muted); }
+.annotation-editor { margin-top: 14px; }
+.annotation-image-wrap { position: relative; display: inline-block; max-width: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: #050c15; line-height: 0; }
+.annotation-image-wrap > img { display: block; max-width: 100%; height: auto; cursor: crosshair; user-select: none; touch-action: none; }
+.annotation-box { position: absolute; display: block; border: 2px solid var(--amber); pointer-events: none; }
+.annotation-box.saved { border-color: var(--green); }
+.annotation-box b { position: absolute; top: -18px; left: -2px; padding: 2px 4px; color: #04140f; background: var(--green); font-family: "DM Mono", monospace; font-size: 9px; line-height: 1.2; white-space: nowrap; }
+.annotation-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; }
+.quality-summary { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; color: var(--soft); font-family: "DM Mono", monospace; font-size: 10px; }
+.release-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.release-controls input { min-width: 190px; flex: 1; padding: 9px 10px; color: var(--soft); border: 1px solid var(--line); border-radius: 7px; outline: none; background: rgba(0, 0, 0, 0.18); font-size: 11px; }
+.release-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(0, 0, 0, 0.12); }
+.release-row span { display: grid; gap: 4px; min-width: 0; }
+.release-row strong { color: var(--soft); font-family: "DM Mono", monospace; font-size: 10px; }
+.release-row small { color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; text-transform: uppercase; }
+.evaluation-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 15px; color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; }
+.evaluation-summary .button { text-decoration: none; }
+.failure-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 7px; padding: 8px 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; font-family: "DM Mono", monospace; font-size: 9px; }
+.failure-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.failure-row em { color: var(--amber); font-style: normal; white-space: nowrap; }
 
 @media (max-width: 1000px) {
   .app-shell { width: min(100% - 30px, 760px); padding-top: 20px; }
   .hero-grid, .lower-grid { grid-template-columns: 1fr; }
   .studio-grid { grid-template-columns: 1fr; }
   .video-frame, .video-frame img, .video-empty { min-height: 360px; }
+  .annotation-controls { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 600px) {
@@ -174,4 +223,6 @@ h2 { margin-top: 7px; font-size: 17px; letter-spacing: -0.02em; }
   .source-row .button { width: 100%; }
   .timeline-step { grid-template-columns: 32px minmax(0, 1fr); }
   .timeline-kind { grid-column: 2; }
+  .annotation-controls { grid-template-columns: 1fr; }
+  .annotation-actions { align-items: stretch; flex-direction: column; }
 }

@@ -55,7 +55,7 @@ class ActivityRegistry:
 
     def _write_manifest(self, package_dir: Path, manifest: ActivityManifest) -> None:
         package_dir.mkdir(parents=True, exist_ok=True)
-        for name in ("takes", "datasets", "reports", "releases", "camera_profiles"):
+        for name in ("takes", "datasets", "reports", "releases", "camera_profiles", "jobs"):
             (package_dir / name).mkdir(exist_ok=True)
         path = package_dir / "activity.yaml"
         payload = manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
