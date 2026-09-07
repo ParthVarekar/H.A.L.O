@@ -376,3 +376,12 @@ either label them consistently or remove them from the detector plan before runn
 `docs/progress_log.md` must be read together with this handover. The historical sections are kept
 for traceability, while the latest checkpoint and unresolved risks are recorded in the final
 sections of each document.
+
+## 17. Collaborator handoff
+
+The repository is prepared for a second person to annotate the MELFI activity. Start with
+training_guide.md for setup and exact Studio actions, then use dataset_progress.md for the
+current data inventory and the remaining annotation and training work. The collaborator's first
+task is to box the take studying_cells_in_space-c2dce8af89 in STEP 05. There are currently zero
+MELFI annotations, no MELFI dataset, and no MELFI training result. After annotation, the quality
+gate must pass with independent recording-session splits before a baseline can be evaluated.

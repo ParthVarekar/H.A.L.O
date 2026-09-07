@@ -332,3 +332,20 @@ recording sessions before relying on validation, evaluation, or training metrics
 
 **Next exact action:** draw and save the intended detector boxes in STEP 05. Add independent
 recording sessions before trusting validation or training metrics.
+
+## Checkpoint 18: collaborator handoff documentation
+
+**Date:** 2026-09-08
+**Status:** repository ready for external MELFI annotation
+
+- Added `dataset_progress.md` with the activity inventory, exact MELFI take metadata, eight-step
+  timeline, object classes, annotation rules, current Concrete Hardening limitations, and next
+  actions.
+- Added `training_guide.md` with clone/setup instructions, the six Studio stages, frame-boxing
+  workflow, class-specific guidance, CUDA checks, quality-gate rules, and AI coding-tool rules.
+- Updated `README.md` with the collaborator quick start and documentation index.
+- Extended `HANDOVER.md` with the collaborator handoff and the current no-annotation/no-training
+  state for MELFI.
+
+**Next exact action:** the collaborator annotates `cold_stowage_melfi` in STEP 05, then runs the
+quality gate before any training or evaluation claim.

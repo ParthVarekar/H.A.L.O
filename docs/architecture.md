@@ -84,7 +84,7 @@ of the red/blue box experiment to fine-tune the detector.
 - `bas_har/config.py` — runtime paths and env.
 - `experiments/red_blue_box/experiment_plan.yaml` — the demo plan.
 - `experiments/red_blue_box/notes.md` — recording protocol.
-- `tests/` — 32 tests covering valid + invalid cases for every Pydantic model and the CLI.
++ `tests/` — 115 tests currently covering schema, procedure, web, studio, IO, capture, voice, and activity-package behavior.
 
 ## Design rules baked into the schema
 
@@ -134,3 +134,8 @@ of truth. The surrounding ISS hardware in the tail segment was not assigned a ME
 direct evidence. Contextual classes such as logos and title cards are currently present in the
 plan, so they must be labelled consistently or removed from the detector plan before the quality
 gate.
+
+The collaborator-facing operating instructions are in `training_guide.md`, and the dataset
+inventory and remaining work are in `dataset_progress.md`. The current MELFI activity is staged
+for manual annotation; no MELFI detector has been trained or evaluated yet. The next milestone is
+a passed session-level quality gate followed by a CUDA baseline and held-out evaluation.
