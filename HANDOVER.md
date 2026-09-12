@@ -385,3 +385,7 @@ current data inventory and the remaining annotation and training work. The colla
 task is to box the take studying_cells_in_space-c2dce8af89 in STEP 05. There are currently zero
 MELFI annotations, no MELFI dataset, and no MELFI training result. After annotation, the quality
 gate must pass with independent recording-session splits before a baseline can be evaluated.
+
+For a complete dated continuation brief, read `CLAUDE_CODE_HANDOVER.md`. It consolidates the
+repository state, exact MELFI and Concrete Hardening inventories, command surface, architecture,
+risks, parked work, and the required progress-log format.

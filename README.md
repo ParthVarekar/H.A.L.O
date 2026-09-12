@@ -23,6 +23,7 @@ The cold_stowage_melfi activity is already imported with its video, eight-step p
 ground-truth timeline. Its bounding boxes have not yet been annotated. The next collaborator can
 clone this repository and use the Studio to label the MELFI video.
 
+- Claude Code handover: CLAUDE_CODE_HANDOVER.md
 - Dataset progress: dataset_progress.md
 - Training Studio guide: training_guide.md
 - Engineering handover: HANDOVER.md

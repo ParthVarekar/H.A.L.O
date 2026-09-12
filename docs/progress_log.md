@@ -349,3 +349,19 @@ recording sessions before trusting validation or training metrics.
 
 **Next exact action:** the collaborator annotates `cold_stowage_melfi` in STEP 05, then runs the
 quality gate before any training or evaluation claim.
+
+## Checkpoint 19: Claude Code continuation handoff
+
+**Date:** 2026-09-13
+**Status:** detailed continuation brief saved
+
+- Added `CLAUDE_CODE_HANDOVER.md` as the dated authoritative continuation brief.
+- Documented Git state, setup and verification commands, architecture/data flow, package map,
+  locked decisions, implemented features, parked phases, risks, exact MELFI and Concrete
+  Hardening states, red/blue demo caveats, and the ordered next-work plan.
+- Documented a mandatory progress-entry format so future annotation and training work can be
+  handed across agents without relying on chat history.
+- Linked the new brief from `README.md` and `HANDOVER.md`.
+
+**Verification pending:** run the full `cmd /c startup.bat test` gate after this documentation
+change, then commit and push the handoff.
