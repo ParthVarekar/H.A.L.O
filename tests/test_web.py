@@ -1,13 +1,16 @@
 import json
 from pathlib import Path
 from threading import Thread
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import cv2
 import numpy as np
+import pytest
 
 from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
 from bas_har.schema.cli import load_plan
+from bas_har.schema.recognition_schema import ActivityRecognition
 from bas_har.studio.registry import ActivityRegistry
 from bas_har.studio.takes import register_take
 from bas_har.web.server import DashboardServer, WebState, _plan_summary, _source_value
@@ -201,6 +204,133 @@ def test_keyframe_and_annotation_api_round_trip(tmp_path: Path) -> None:
         with urlopen(f"{base}/annotations?take_id={take.take_id}", timeout=2) as response:
             annotations = json.loads(response.read().decode("utf-8"))
         assert annotations[0]["label"] == "red_block"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def _unrecognized(registry: ActivityRegistry, video: Path) -> ActivityRecognition:
+    return ActivityRecognition(
+        video=str(video),
+        sampled_frames=3,
+        min_score=0.5,
+        min_margin=0.25,
+        min_similarity=0.9,
+        recognized=False,
+        reason="no match",
+    )
+
+
+def _analysis_server(tmp_path: Path, state: WebState) -> tuple[DashboardServer, Thread]:
+    server = DashboardServer(
+        ("127.0.0.1", 0),
+        state,
+        "models/yolo11n.pt",
+        "cpu",
+        registry=ActivityRegistry(tmp_path / "activities"),
+        recognizer=_unrecognized,
+        upload_dir=tmp_path / "uploads",
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
+
+
+def test_analyze_reports_unrecognized_video_without_starting_capture(tmp_path: Path) -> None:
+    state = WebState(load_plan(Path("experiments/red_blue_box/experiment_plan.yaml")))
+    server, thread = _analysis_server(tmp_path, state)
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/api/analyze",
+            data=b"video-bytes",
+            headers={"X-Filename": "take.mp4"},
+            method="POST",
+        )
+        with urlopen(request, timeout=5) as response:
+            assert response.status == 200
+            body = json.loads(response.read().decode("utf-8"))
+        assert body["recognized"] is False
+        assert state.get_runner() is None
+        assert state.snapshot()["analysis"]["reason"] == "no match"
+        assert list((tmp_path / "uploads").iterdir()) == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_analyze_with_selected_activity_skips_recognition(tmp_path: Path) -> None:
+    state = WebState(load_plan(Path("experiments/red_blue_box/experiment_plan.yaml")))
+    server, thread = _analysis_server(tmp_path, state)
+    server.recognizer = _fail_if_called
+    server.registry.create(
+        ActivityManifest(id="sample_handling", name="Sample Handling", kind=ActivityKind.EXPERIMENT)
+    )
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with urlopen(f"{base}/api/analyze/activities", timeout=5) as response:
+            listed = json.loads(response.read().decode("utf-8"))
+        assert listed == [
+            {"id": "sample_handling", "name": "Sample Handling", "has_detector": False}
+        ]
+        request = Request(
+            f"{base}/api/analyze",
+            data=b"video-bytes",
+            headers={"X-Filename": "take.mp4", "X-Activity-Id": "sample_handling"},
+            method="POST",
+        )
+        with pytest.raises(HTTPError) as caught:
+            urlopen(request, timeout=5)
+        assert caught.value.code == 400
+        assert list((tmp_path / "uploads").iterdir()) == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_analyze_rejects_unknown_selected_activity(tmp_path: Path) -> None:
+    state = WebState(load_plan(Path("experiments/red_blue_box/experiment_plan.yaml")))
+    server, thread = _analysis_server(tmp_path, state)
+    server.recognizer = _fail_if_called
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/api/analyze",
+            data=b"video-bytes",
+            headers={"X-Filename": "take.mp4", "X-Activity-Id": "nope"},
+            method="POST",
+        )
+        with pytest.raises(HTTPError) as caught:
+            urlopen(request, timeout=5)
+        assert caught.value.code == 400
+        assert "unknown activity" in json.loads(caught.value.read().decode("utf-8"))["error"]
+        assert list((tmp_path / "uploads").iterdir()) == []
+        assert state.get_runner() is None
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def _fail_if_called(registry: ActivityRegistry, video: Path) -> ActivityRecognition:
+    raise AssertionError("recognizer must not run when an activity is selected")
+
+
+def test_analyze_rejects_unsupported_file_type(tmp_path: Path) -> None:
+    state = WebState(load_plan(Path("experiments/red_blue_box/experiment_plan.yaml")))
+    server, thread = _analysis_server(tmp_path, state)
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/api/analyze",
+            data=b"not-a-video",
+            headers={"X-Filename": "notes.txt"},
+            method="POST",
+        )
+        with pytest.raises(HTTPError) as caught:
+            urlopen(request, timeout=5)
+        assert caught.value.code == 400
+        assert "unsupported video type" in json.loads(caught.value.read().decode("utf-8"))["error"]
     finally:
         server.shutdown()
         server.server_close()

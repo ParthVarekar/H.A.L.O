@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from bas_har.perception.types import BBox, Detection, PerceptionResult
-from bas_har.procedure.evidence import EvidenceAccumulator
-from bas_har.schema.plan_schema import EvidenceRule, ObjectSpec, StepSpec
+from bas_har.procedure.evidence import EvidenceAccumulator, perception_needs
+from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
 
 
 def _result(*detections: Detection) -> PerceptionResult:
@@ -73,3 +75,31 @@ def test_object_visible_outside_of_rejects_contained_detection() -> None:
     assert not contained_match
     assert outside_match
     assert verdicts[0].conf == 0.7
+
+
+def _plan_with_rules(*rules: dict) -> ExperimentPlan:
+    return ExperimentPlan.model_validate(
+        {
+            "id": "needs",
+            "name": "needs",
+            "objects": [{"id": "box", "classes": ["box"]}],
+            "steps": [{"id": "step_0", "description": "step", "evidence": list(rules)}],
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("rules", "expected"),
+    [
+        ([{"kind": "object_visible", "object": "box"}], (False, False)),
+        ([{"kind": "actor_visible"}, {"kind": "object_visible", "object": "box"}], (True, False)),
+        (
+            [{"kind": "hand_object_interaction", "object": "box", "label": "grasping"}],
+            (False, True),
+        ),
+    ],
+)
+def test_perception_needs_follow_plan_evidence_kinds(
+    rules: list[dict], expected: tuple[bool, bool]
+) -> None:
+    assert perception_needs(_plan_with_rules(*rules)) == expected

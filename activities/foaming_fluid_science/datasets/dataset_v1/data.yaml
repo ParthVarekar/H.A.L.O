@@ -1,0 +1,10 @@
+path: .
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: astronaut
+  1: experiment_container
+  2: control_panel
+  3: computer
+  4: esa_logo

@@ -1,10 +1,15 @@
 id: cold_stowage_melfi
 name: Cold Stowage and MELFI Overview
-version: 0.1.0
+version: 0.3.0
 author: local
 created: ''
-description: Overview of Cold Stowage operations and MELFI freezer hardware on the
-  ISS.
+description: 'Overview of Cold Stowage/MELFI-context video content. Revised 2026-09-13:
+  melfi_freezer, dewar_compartment, and control_panel were removed because no footage
+  in this take supports them -- visual inspection during annotation found the 30-100s
+  window is actually the Life Sciences Glovebox (LSG), confirmed by its own on-screen
+  label, not MELFI hardware. Added life_sciences_glovebox to reflect what the take
+  genuinely shows. Revised 2026-09-14: removed the title-card step and the title_card/nasa_logo
+  objects, which never appear in this take.'
 camera:
   source: 0
   fps: 25
@@ -20,21 +25,13 @@ objects:
   classes:
   - interviewee
   colors_any: []
-- id: melfi_freezer
-  classes:
-  - melfi_freezer
-  colors_any: []
-- id: dewar_compartment
-  classes:
-  - dewar_compartment
-  colors_any: []
 - id: sample_container
   classes:
   - sample_container
   colors_any: []
-- id: control_panel
+- id: life_sciences_glovebox
   classes:
-  - control_panel
+  - life_sciences_glovebox
   colors_any: []
 - id: astronaut_1
   classes:
@@ -44,35 +41,13 @@ objects:
   classes:
   - computer
   colors_any: []
-- id: nasa_logo
-  classes:
-  - nasa_logo
-  colors_any: []
 - id: esa_logo
   classes:
   - esa_logo
   colors_any: []
-- id: title_card
-  classes:
-  - title_card
-  colors_any: []
 regions: []
 region_geometries: {}
 steps:
-- id: step_001
-  description: Title card and logos appear.
-  evidence:
-  - kind: object_visible
-    object: title_card
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
-  next:
-  - step_002
-  timeout_s: 60.0
-  expected_duration_s: 5.0
 - id: step_002
   description: Interviewee explains Cold Stowage and MELFI.
   evidence:
@@ -86,12 +61,12 @@ steps:
   next:
   - step_003
   timeout_s: 60.0
-  expected_duration_s: 60.0
+  expected_duration_s: 40.0
 - id: step_003
-  description: MELFI freezer unit is shown.
+  description: Life Sciences Glovebox (LSG) is shown in close-up use.
   evidence:
   - kind: object_visible
-    object: melfi_freezer
+    object: life_sciences_glovebox
     label: null
     state: null
     outside_of: null
@@ -100,50 +75,8 @@ steps:
   next:
   - step_004
   timeout_s: 60.0
-  expected_duration_s: 10.0
+  expected_duration_s: 60.0
 - id: step_004
-  description: Dewar compartments are visible.
-  evidence:
-  - kind: object_visible
-    object: dewar_compartment
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
-  next:
-  - step_005
-  timeout_s: 60.0
-  expected_duration_s: 10.0
-- id: step_005
-  description: Sample containers inside dewar are shown.
-  evidence:
-  - kind: object_visible
-    object: sample_container
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
-  next:
-  - step_006
-  timeout_s: 60.0
-  expected_duration_s: 10.0
-- id: step_006
-  description: Control panel and display are shown.
-  evidence:
-  - kind: object_visible
-    object: control_panel
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
-  next:
-  - step_007
-  timeout_s: 60.0
-  expected_duration_s: 10.0
-- id: step_007
   description: Astronaut works with visible ISS equipment and a mounted computer.
   evidence:
   - kind: object_visible
@@ -154,10 +87,10 @@ steps:
     in_region: null
     min_frames: 5
   next:
-  - step_008
+  - step_005
   timeout_s: 60.0
-  expected_duration_s: 38.0
-- id: step_008
+  expected_duration_s: 43.0
+- id: step_005
   description: ESA logo animation appears as the video end card.
   evidence:
   - kind: object_visible

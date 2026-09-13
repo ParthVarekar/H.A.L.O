@@ -1,0 +1,89 @@
+id: foaming_fluid_science
+name: Foaming Fluid Science (FOAM-C) Overview
+version: 0.1.0
+author: local
+created: ''
+description: 'Astronaut conducts the FOAM-C foam-coarsening experiment in the Fluid
+  Science Laboratory (FSL), Columbus module: handling the white Experiment Container,
+  configuring the FSL control panel, and monitoring via the mounted display.'
+camera:
+  source: 0
+  fps: 25
+  resolution:
+  - 768
+  - 432
+fiducial:
+  type: none
+  family: tag36h11
+  size_mm: 120.0
+objects:
+- id: astronaut_1
+  classes:
+  - astronaut
+  colors_any: []
+- id: experiment_container
+  classes:
+  - experiment_container
+  colors_any: []
+- id: control_panel
+  classes:
+  - control_panel
+  colors_any: []
+- id: computer
+  classes:
+  - computer
+  colors_any: []
+- id: esa_logo
+  classes:
+  - esa_logo
+  colors_any: []
+regions: []
+region_geometries: {}
+steps:
+- id: step_001
+  description: Astronaut retrieves and handles the white FOAM-C Experiment Container.
+  evidence:
+  - kind: object_visible
+    object: experiment_container
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - step_002
+  timeout_s: 60.0
+  expected_duration_s: 20.0
+- id: step_002
+  description: Astronaut configures the FSL control panel and mounted equipment interfaces.
+  evidence:
+  - kind: object_visible
+    object: control_panel
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next:
+  - step_003
+  timeout_s: 60.0
+  expected_duration_s: 22.0
+- id: step_003
+  description: ESA logo animation appears as the video end card.
+  evidence:
+  - kind: object_visible
+    object: esa_logo
+    label: null
+    state: null
+    outside_of: null
+    in_region: null
+    min_frames: 5
+  next: []
+  timeout_s: 60.0
+  expected_duration_s: 10.0
+alert_policy:
+  skip_confidence_threshold: 0.85
+  skip_persistence_frames: 5
+  rate_limit_s: 5.0
+  silence_window_s: 60.0
+  pause_tolerance_s: 30.0

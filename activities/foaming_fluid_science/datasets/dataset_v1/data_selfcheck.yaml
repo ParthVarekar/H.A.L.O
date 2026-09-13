@@ -1,0 +1,10 @@
+path: C:/Users/Parth/Desktop/HAR_for_BAS/activities/foaming_fluid_science/datasets/dataset_v1
+train: images/train
+val: images/train
+test: images/train
+names:
+  0: astronaut
+  1: experiment_container
+  2: control_panel
+  3: computer
+  4: esa_logo

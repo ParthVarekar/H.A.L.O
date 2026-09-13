@@ -524,7 +524,19 @@ function TrainingStudio() {
     setDragStart(null);
   }
 
-  async function saveFrameAnnotation() {
+  function goToNextFrame() {
+    if (!activeFrame) return;
+    const frameIndex = keyframes.findIndex((frame) => frame.frame_id === activeFrame.frame_id);
+    const nextFrame = keyframes[frameIndex + 1];
+    if (nextFrame) {
+      setActiveFrame(nextFrame);
+      setDraftBox(null);
+      setDragStart(null);
+      setMessage(`Frame ${nextFrame.time_s.toFixed(2)}s loaded.`);
+    }
+  }
+
+  async function saveFrameAnnotation(advance) {
     if (!selectedId || !selectedTakeId || !activeFrame || !draftBox) return;
     setProcedureBusy(true);
     setError("");
@@ -546,13 +558,17 @@ function TrainingStudio() {
       setAnnotations((current) => [...current.filter((item) => item.id !== saved.id), saved]);
       setDraftBox(null);
       setDragStart(null);
-      const frameIndex = keyframes.findIndex((frame) => frame.frame_id === activeFrame.frame_id);
-      const nextFrame = keyframes[frameIndex + 1];
-      if (nextFrame) {
-        setActiveFrame(nextFrame);
-        setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Next frame ${nextFrame.time_s.toFixed(2)}s loaded.`);
+      if (advance) {
+        const frameIndex = keyframes.findIndex((frame) => frame.frame_id === activeFrame.frame_id);
+        const nextFrame = keyframes[frameIndex + 1];
+        if (nextFrame) {
+          setActiveFrame(nextFrame);
+          setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Next frame ${nextFrame.time_s.toFixed(2)}s loaded.`);
+        } else {
+          setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Final frame complete.`);
+        }
       } else {
-        setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Final frame complete.`);
+        setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Draw the next box on this frame, or move on when done.`);
       }
     } catch (requestError) {
       setError(requestError.message);
@@ -564,11 +580,11 @@ function TrainingStudio() {
   useEffect(() => {
     function handleAnnotationShortcut(event) {
       const tagName = event.target?.tagName || "";
-      if (event.key !== "Enter" || event.repeat || event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return;
+      if (event.key !== "Enter" || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
       if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tagName)) return;
       if (!draftBox || procedureBusy || !activeFrame) return;
       event.preventDefault();
-      void saveFrameAnnotation();
+      void saveFrameAnnotation(event.shiftKey);
     }
 
     window.addEventListener("keydown", handleAnnotationShortcut);
@@ -903,8 +919,10 @@ function TrainingStudio() {
                       {draftBox && <span className="annotation-box draft" style={{ left: `${draftBox.x1 / activeFrame.width * 100}%`, top: `${draftBox.y1 / activeFrame.height * 100}%`, width: `${(draftBox.x2 - draftBox.x1) / activeFrame.width * 100}%`, height: `${(draftBox.y2 - draftBox.y1) / activeFrame.height * 100}%` }} />}
                     </div>
                     <div className="annotation-actions">
-                      <span>{activeFrame.time_s.toFixed(2)}s · {activeFrameAnnotations.length} saved label(s) · Press Enter to save and load next</span>
-                      <button className="button button-primary" onClick={saveFrameAnnotation} disabled={!draftBox || procedureBusy} type="button">Save &amp; next frame</button>
+                      <span>{activeFrame.time_s.toFixed(2)}s · {activeFrameAnnotations.length} saved label(s) · Enter saves and stays, Shift+Enter saves and advances</span>
+                      <button className="button" onClick={() => saveFrameAnnotation(false)} disabled={!draftBox || procedureBusy} type="button">Save label</button>
+                      <button className="button button-primary" onClick={() => saveFrameAnnotation(true)} disabled={!draftBox || procedureBusy} type="button">Save &amp; next frame</button>
+                      <button className="button" onClick={goToNextFrame} disabled={procedureBusy} type="button">Next frame</button>
                     </div>
                   </div>
                 )}

@@ -1,0 +1,21 @@
+{
+  "id": "dataset_v1",
+  "activity_id": "foaming_fluid_science",
+  "take_ids": [
+    "stuying_fluid_sciences_in_space-4fe26c68f3"
+  ],
+  "session_ids": [
+    "foaming_fluid_science_session_001"
+  ],
+  "train_ratio": 0.7000000000000001,
+  "validation_ratio": 0.2,
+  "test_ratio": 0.1,
+  "split_locked": true,
+  "split_sessions": {
+    "train": [
+      "foaming_fluid_science_session_001"
+    ],
+    "val": [],
+    "test": []
+  }
+}

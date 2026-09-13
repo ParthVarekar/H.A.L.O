@@ -17,7 +17,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 from bas_har.perception.types import BBox, PerceptionResult
-from bas_har.schema.plan_schema import EvidenceRule, ObjectSpec, StepSpec
+from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
+
+
+def perception_needs(plan: ExperimentPlan) -> tuple[bool, bool]:
+    kinds = {rule.kind for step in plan.steps for rule in step.evidence}
+    return "actor_visible" in kinds, "hand_object_interaction" in kinds
 
 
 @dataclass(slots=True)

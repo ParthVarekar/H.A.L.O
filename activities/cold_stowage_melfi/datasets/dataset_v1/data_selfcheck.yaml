@@ -1,0 +1,13 @@
+path: C:/Users/Parth/Desktop/HAR_for_BAS/activities/cold_stowage_melfi/datasets/dataset_v1
+train: images/train
+val: images/train
+test: images/train
+names:
+  0: interviewee
+  1: sample_container
+  2: life_sciences_glovebox
+  3: astronaut
+  4: computer
+  5: nasa_logo
+  6: esa_logo
+  7: title_card

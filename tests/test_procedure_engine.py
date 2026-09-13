@@ -29,6 +29,8 @@ from bas_har.schema.plan_schema import ExperimentPlan
 PLAN_YAML = """
 id: TEST-3STEP
 name: Three Step Test
+camera:
+  fps: 4
 objects:
   - id: a
     classes: [a]
@@ -134,9 +136,112 @@ def test_skip_detection_fires_alert() -> None:
     for _ in range(2):
         engine.step(_result_with_hoi("a"))
     assert engine.current_step.id == "do_b"
-    for _ in range(5):
+    for _ in range(8):
         out = engine.step(_result_with_hoi("c"))
     assert AlertCode.SKIP_DETECTED in out.fired_alerts
+
+
+def test_persistent_later_step_skips_ahead() -> None:
+    plan = _plan()
+    engine = build_engine(plan)
+    for _ in range(2):
+        engine.step(_result_with_hoi("a"))
+    events = []
+    for _ in range(8):
+        events.extend(engine.step(_result_with_hoi("c")).events)
+    assert engine.state == EngineState.COMPLETED
+    assert engine.skipped_step_ids == ["do_b"]
+    statuses = [(event.step_id, event.step_status) for event in events]
+    assert ("do_b", StepStatus.SKIPPED) in statuses
+    assert ("do_c", StepStatus.COMPLETED) in statuses
+    skipped_event = next(event for event in events if event.step_status == StepStatus.SKIPPED)
+    assert skipped_event.alert_code == AlertCode.SKIP_DETECTED
+    assert skipped_event.extra["detected_step_id"] == "do_c"
+
+
+def test_single_frame_of_later_step_does_not_skip() -> None:
+    plan = _plan()
+    engine = build_engine(plan)
+    for _ in range(2):
+        engine.step(_result_with_hoi("a"))
+    engine.step(_result_with_hoi("c"))
+    engine.step(_result_with_hoi("c"))
+    out = engine.step(_empty_result())
+    assert out.current_step_id == "do_b"
+    assert engine.skipped_step_ids == []
+    assert AlertCode.SKIP_DETECTED not in out.fired_alerts
+
+
+def test_skipped_step_seen_later_completes_out_of_order() -> None:
+    plan = _plan()
+    plan.steps.append(plan.steps[2].model_copy(update={"id": "do_d", "next": []}, deep=True))
+    plan.steps[2].next = ["do_d"]
+    plan.steps[3].evidence[0].object = "a"
+    engine = build_engine(plan)
+    for _ in range(2):
+        engine.step(_result_with_hoi("a"))
+    for _ in range(8):
+        engine.step(_result_with_hoi("c"))
+    assert engine.skipped_step_ids == ["do_b"]
+    assert engine.current_step.id == "do_d"
+    events = []
+    for _ in range(8):
+        events.extend(engine.step(_result_with_hoi("b")).events)
+    late = [event for event in events if event.step_id == "do_b"]
+    assert late[0].step_status == StepStatus.COMPLETED
+    assert late[0].alert_code == AlertCode.OUT_OF_ORDER
+    assert engine.skipped_step_ids == []
+    assert engine.current_step.id == "do_d"
+
+
+def test_flickering_later_step_still_skips_ahead() -> None:
+    plan = _plan()
+    engine = build_engine(plan)
+    for _ in range(2):
+        engine.step(_result_with_hoi("a"))
+    for _ in range(4):
+        engine.step(_result_with_hoi("c"))
+        engine.step(_result_with_hoi("c"))
+        engine.step(_empty_result())
+    engine.step(_result_with_hoi("c"))
+    assert engine.skipped_step_ids == ["do_b"]
+    assert engine.state == EngineState.COMPLETED
+
+
+def test_brief_burst_of_later_step_does_not_skip() -> None:
+    plan = _plan()
+    engine = build_engine(plan)
+    for _ in range(2):
+        engine.step(_result_with_hoi("a"))
+    for _ in range(3):
+        engine.step(_result_with_hoi("c"))
+    for _ in range(6):
+        out = engine.step(_empty_result())
+    assert out.current_step_id == "do_b"
+    assert engine.skipped_step_ids == []
+    assert AlertCode.SKIP_DETECTED not in out.fired_alerts
+
+
+def test_media_time_rate_limit_ignores_wall_clock() -> None:
+    plan = _plan()
+    plan.alert_policy.rate_limit_s = 5.0
+    engine = build_engine(plan, use_media_time=True)
+    assert engine.alerter.fire(_candidate(), now=0.0)
+    assert not engine.alerter.fire(_candidate(), now=4.0)
+    assert engine.alerter.fire(_candidate(), now=5.5)
+
+
+def _candidate():
+    from bas_har.procedure import AlertCandidate
+
+    return AlertCandidate(
+        code=AlertCode.SKIP_DETECTED,
+        step_id="do_b",
+        message="",
+        confidence=0.9,
+        persistence_frames=5,
+        extra={},
+    )
 
 
 def test_pause_then_resume() -> None:
@@ -160,7 +265,7 @@ def test_silence_window_blocks_alerts() -> None:
         engine.step(_result_with_hoi("a"))
     engine.silence()
     assert engine.alerter.silence_active()
-    for _ in range(5):
+    for _ in range(8):
         out = engine.step(_result_with_hoi("c"))
     assert AlertCode.SKIP_DETECTED not in out.fired_alerts
 
@@ -171,10 +276,10 @@ def test_alerter_rate_limits() -> None:
     engine = build_engine(plan)
     for _ in range(2):
         engine.step(_result_with_hoi("a"))
-    for _ in range(5):
+    for _ in range(8):
         engine.step(_result_with_hoi("c"))
     first_count = len(engine.alerter.fired())
-    for _ in range(5):
+    for _ in range(8):
         engine.step(_result_with_hoi("c"))
     assert len(engine.alerter.fired()) == first_count
 
@@ -205,3 +310,66 @@ def test_engine_emits_to_optional_sink(tmp_path: Path) -> None:
     engine.close()
     body = sink_path.read_text(encoding="utf-8")
     assert '"step_id":"do_a"' in body
+
+
+def _at(result: PerceptionResult, seconds: float) -> PerceptionResult:
+    result.ts_ms = round(seconds * 1000)
+    return result
+
+
+def test_media_time_pause_ignores_wall_clock() -> None:
+    plan = _plan()
+    plan.alert_policy.pause_tolerance_s = 2.0
+    engine = build_engine(plan, use_media_time=True)
+    engine.step(_at(_result_with_hoi("a"), 0.0))
+    out = engine.step(_at(_empty_result(), 1.0))
+    assert not out.pause_active
+    out = engine.step(_at(_empty_result(), 2.5))
+    assert out.pause_active
+
+
+def test_pause_tolerance_follows_completed_step_duration() -> None:
+    plan = _plan()
+    plan.alert_policy.pause_tolerance_s = 2.0
+    plan.steps[0].expected_duration_s = 10.0
+    engine = build_engine(plan, use_media_time=True)
+    engine.step(_at(_result_with_hoi("a"), 0.0))
+    out = engine.step(_at(_result_with_hoi("a"), 0.1))
+    assert out.current_step_id == "do_b"
+    assert engine.pause_watchdog.tolerance_s == 15.0
+    out = engine.step(_at(_empty_result(), 10.0))
+    assert not out.pause_active
+    out = engine.step(_at(_empty_result(), 15.2))
+    assert out.pause_active
+    assert out.last_event is not None
+    assert out.last_event.alert_code == AlertCode.PAUSE_EXCEEDED
+
+
+def test_pause_tolerance_never_drops_below_policy() -> None:
+    plan = _plan()
+    plan.alert_policy.pause_tolerance_s = 2.0
+    engine = build_engine(plan)
+    assert engine.pause_tolerance_after(plan.steps[0]) == 2.0
+    plan.steps[0].expected_duration_s = 1.0
+    assert engine.pause_tolerance_after(plan.steps[0]) == 2.0
+    plan.steps[0].expected_duration_s = 4.0
+    assert engine.pause_tolerance_after(plan.steps[0]) == 6.0
+
+
+def test_media_time_events_record_video_time() -> None:
+    plan = _plan()
+    engine = build_engine(plan, use_media_time=True)
+    engine.step(_at(_result_with_hoi("a"), 3.0))
+    out = engine.step(_at(_result_with_hoi("a"), 3.04))
+    assert out.last_event is not None
+    assert out.last_event.step_status == StepStatus.COMPLETED
+    assert out.last_event.extra["video_time_s"] == 3.04
+
+
+def test_wall_clock_mode_does_not_record_video_time() -> None:
+    plan = _plan()
+    engine = build_engine(plan)
+    for _ in range(2):
+        out = engine.step(_result_with_hoi("a"))
+    assert out.last_event is not None
+    assert "video_time_s" not in out.last_event.extra

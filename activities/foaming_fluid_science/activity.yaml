@@ -1,0 +1,10 @@
+id: foaming_fluid_science
+name: Foaming Fluid Science (FOAM-C)
+kind: experiment
+version: 0.1.0
+author: local
+description: A video-grounded procedure package for the FOAM-C foam-coarsening experiment
+  run in the Fluid Science Laboratory (FSL) aboard the ISS Columbus module.
+plan_path: plan.yaml
+camera_profile: default
+lifecycle: imported

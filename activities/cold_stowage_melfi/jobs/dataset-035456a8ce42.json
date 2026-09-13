@@ -1,0 +1,8 @@
+{
+  "id": "dataset-035456a8ce42",
+  "activity_id": "cold_stowage_melfi",
+  "status": "failed",
+  "progress": 0.0,
+  "dataset_id": null,
+  "error": "annotation label is not in the activity classes: life_sciences_glovebox"
+}

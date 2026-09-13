@@ -10,6 +10,7 @@ import time
 import urllib.parse
 import urllib.request
 import webbrowser
+from collections.abc import Callable
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,7 +20,12 @@ from uuid import uuid4
 from pydantic import TypeAdapter, ValidationError
 
 from bas_har.config import logs_dir, project_root
-from bas_har.procedure import ColorSequenceTracker, ProcedureEngine, build_engine
+from bas_har.procedure import (
+    ColorSequenceTracker,
+    ProcedureEngine,
+    build_engine,
+    perception_needs,
+)
 from bas_har.schema.activity_schema import (
     ActivityId,
     ActivityLifecycle,
@@ -32,6 +38,7 @@ from bas_har.schema.activity_schema import (
 from bas_har.schema.cli import load_plan
 from bas_har.schema.event_schema import EventRecord
 from bas_har.schema.plan_schema import ExperimentPlan
+from bas_har.schema.recognition_schema import ActivityRecognition
 from bas_har.studio.annotations import (
     list_annotations,
     list_keyframes,
@@ -44,6 +51,7 @@ from bas_har.studio.hardware import hardware_snapshot
 from bas_har.studio.jobs import DatasetJobManager, TrainingJobManager
 from bas_har.studio.plans import load_activity_plan, save_activity_plan
 from bas_har.studio.quality import inspect_dataset, load_quality_report
+from bas_har.studio.recognition import activity_detector_path, recognize_activity
 from bas_har.studio.registry import ActivityRegistry
 from bas_har.studio.releases import (
     activate_release,
@@ -58,6 +66,9 @@ from bas_har.voice import ConfirmationSound
 
 STATIC_DIR = project_root() / "web" / "dist"
 DEFAULT_TARGET_CLASSES = ["box", "cup", "bottle", "bowl", "book", "orange", "banana", "apple"]
+VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
+MAX_VIDEO_BYTES = 4_000_000_000
+DISCARD_BODY_LIMIT = 64_000_000
 
 
 def _source_value(source: int | str) -> int | str:
@@ -239,6 +250,8 @@ class WebState:
             "recognizer": None,
             "has_frame": False,
             "started_at": None,
+            "summary": None,
+            "analysis": None,
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -277,6 +290,7 @@ class WebState:
                 recognizer=None,
                 has_frame=False,
                 started_at=None,
+                summary=None,
             )
 
     def append_event(self, event: EventRecord) -> None:
@@ -326,6 +340,8 @@ class WebState:
                 recognizer=None,
                 has_frame=False,
                 started_at=None,
+                summary=None,
+                analysis=None,
             )
 
     def set_frame(self, frame_jpeg: bytes, frame_id: int) -> None:
@@ -346,12 +362,16 @@ class SessionRunner:
         yolo_model: str,
         max_frames: int | None = None,
         device: str = "auto",
+        filter_default_classes: bool = True,
+        use_media_time: bool = False,
     ) -> None:
         self.state = state
         self.source = source
         self.yolo_model = yolo_model
         self.max_frames = max_frames
         self.device = device
+        self.filter_default_classes = filter_default_classes
+        self.use_media_time = use_media_time
         self.stop_event = threading.Event()
         self.engine: ProcedureEngine | None = None
         self.engine_lock = threading.Lock()
@@ -383,6 +403,9 @@ class SessionRunner:
         buffer: Any | None = None
         sink: Any | None = None
         confirmation: ConfirmationSound | None = None
+        sequence: ColorSequenceTracker | None = None
+        completed_steps: list[str] = []
+        late_steps: list[str] = []
         try:
             width, height = self.state.plan.camera.resolution
             capture = VideoCaptureSource(
@@ -397,15 +420,20 @@ class SessionRunner:
             confirmation = ConfirmationSound()
             buffer_dir = logs_dir() / "buffer" / self.state.plan.experiment_id
             try:
-                sequence: ColorSequenceTracker | None = ColorSequenceTracker(self.state.plan)
+                sequence = ColorSequenceTracker(self.state.plan)
             except ValueError:
                 sequence = None
-            self.engine = build_engine(self.state.plan, sink=None if sequence is not None else sink)
+            self.engine = build_engine(
+                self.state.plan,
+                sink=None if sequence is not None else sink,
+                use_media_time=self.use_media_time,
+            )
+            needs_pose, needs_hands = perception_needs(self.state.plan)
             pipeline = PerceptionPipeline(
                 yolo_model=self.yolo_model,
-                target_classes=DEFAULT_TARGET_CLASSES,
-                run_pose=sequence is None,
-                run_hands=sequence is None,
+                target_classes=DEFAULT_TARGET_CLASSES if self.filter_default_classes else None,
+                run_pose=sequence is None and needs_pose,
+                run_hands=sequence is None and needs_hands,
                 device=self.device,
                 color_names=_plan_color_names(self.state.plan),
             )
@@ -427,7 +455,6 @@ class SessionRunner:
             )
             started = time.perf_counter()
             frame_id = 0
-            last_engine_event: EventRecord | None = None
             while not self.stop_event.is_set():
                 if self.max_frames is not None and frame_id >= self.max_frames:
                     break
@@ -470,14 +497,15 @@ class SessionRunner:
                 else:
                     with self.engine_lock:
                         output = self.engine.step(result)
-                    if output.last_event is not None and output.last_event is not last_engine_event:
-                        last_engine_event = output.last_event
-                        self.state.append_event(output.last_event)
-                        if (
-                            output.last_event.step_status.value == "completed"
-                            and confirmation is not None
-                        ):
-                            confirmation.ping()
+                    for event in output.events:
+                        self.state.append_event(event)
+                        if event.step_status.value == "completed":
+                            if event.step_id not in completed_steps:
+                                completed_steps.append(event.step_id)
+                            if event.extra.get("out_of_order") and event.step_id not in late_steps:
+                                late_steps.append(event.step_id)
+                            if confirmation is not None:
+                                confirmation.ping()
                     display_state = output.state.value
                     display_step_id = output.current_step_id
                     display_confidence = output.current_step_confidence
@@ -534,7 +562,22 @@ class SessionRunner:
                 message = "Capture stopped" if self.stop_event.is_set() else "Source complete"
                 if was_error:
                     message = "Capture error"
-                self.state.status.update(running=False, message=message)
+                summary: dict[str, Any] | None = None
+                if self.engine is not None and sequence is None:
+                    plan_steps = [step.id for step in self.state.plan.steps]
+                    skipped = set(self.engine.skipped_step_ids)
+                    summary = {
+                        "experiment_id": self.state.plan.experiment_id,
+                        "total_steps": len(plan_steps),
+                        "completed_steps": [s for s in plan_steps if s in completed_steps],
+                        "out_of_order_steps": [s for s in plan_steps if s in late_steps],
+                        "skipped_steps": [s for s in plan_steps if s in skipped],
+                        "missed_steps": [
+                            s for s in plan_steps if s not in completed_steps and s not in skipped
+                        ],
+                        "source_finished": not self.stop_event.is_set() and not was_error,
+                    }
+                self.state.status.update(running=False, message=message, summary=summary)
             if self.state.get_runner() is self:
                 self.state.set_runner(None)
 
@@ -563,6 +606,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(
                 [
                     manifest.model_dump(mode="json", by_alias=True, exclude_none=True)
+                    for manifest in self.server.registry.list_activities()
+                ]
+            )
+            return
+        if parsed.path == "/api/analyze/activities":
+            self._send_json(
+                [
+                    {
+                        "id": manifest.activity_id,
+                        "name": manifest.name,
+                        "has_detector": activity_detector_path(
+                            self.server.registry, manifest.activity_id
+                        ).is_file(),
+                    }
                     for manifest in self.server.registry.list_activities()
                 ]
             )
@@ -810,6 +867,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/analyze":
+            self._analyze_video()
+            return
         if parsed.path.count("/") == 4 and parsed.path.endswith("/takes"):
             self._upload_take(parsed.path.removesuffix("/takes"))
             return
@@ -961,6 +1021,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if not verification.passed:
             raise ValueError("activity package verification failed")
         self.server.yolo_model = str(model_path)
+        self.server.filter_default_classes = False
         self.server.state.replace_plan(plan)
         self._send_json(
             {
@@ -1159,10 +1220,129 @@ class DashboardHandler(BaseHTTPRequestHandler):
             yolo_model=self.server.yolo_model,
             max_frames=payload.get("max_frames"),
             device=self.server.device,
+            filter_default_classes=self.server.filter_default_classes,
         )
         self.server.state.set_runner(runner)
         runner.start()
         self._send_json({"ok": True, "source": str(source)}, HTTPStatus.ACCEPTED)
+
+    def _analyze_video(self) -> None:
+        existing = self.server.state.get_runner()
+        if existing is not None and existing.is_alive():
+            self._send_json(
+                {"error": "stop the running capture before analysing a video"},
+                HTTPStatus.CONFLICT,
+            )
+            return
+        selected_id = self.headers.get("X-Activity-Id", "").strip()
+        try:
+            video = self._receive_video_upload()
+        except ValueError as exc:
+            self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        try:
+            if selected_id:
+                recognition = self._manual_recognition(video, selected_id)
+            else:
+                recognition = self.server.recognizer(self.server.registry, video)
+        except (FileNotFoundError, ValueError, ValidationError, RuntimeError, OSError) as exc:
+            video.unlink(missing_ok=True)
+            self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        analysis = recognition.model_dump(mode="json", by_alias=True)
+        if not recognition.recognized or recognition.activity_id is None:
+            video.unlink(missing_ok=True)
+            self.server.state.update(analysis=analysis, message="Experiment not recognised")
+            self._send_json(analysis)
+            return
+        try:
+            plan = load_activity_plan(self.server.registry, recognition.activity_id)
+            detector = activity_detector_path(self.server.registry, recognition.activity_id)
+        except (FileNotFoundError, ValueError, ValidationError) as exc:
+            video.unlink(missing_ok=True)
+            self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if not detector.is_file():
+            video.unlink(missing_ok=True)
+            self.server.state.update(
+                analysis=analysis,
+                message="Experiment recognised, but it has no trained detector for step monitoring",
+            )
+            self._send_json(analysis)
+            return
+        self.server.state.replace_plan(plan)
+        self.server.yolo_model = str(detector)
+        self.server.filter_default_classes = False
+        self.server.state.prepare_for_capture(str(video))
+        self.server.state.update(analysis=analysis)
+        runner = SessionRunner(
+            self.server.state,
+            source=str(video),
+            yolo_model=str(detector),
+            device=self.server.device,
+            filter_default_classes=False,
+            use_media_time=True,
+        )
+        self.server.state.set_runner(runner)
+        runner.start()
+        self._send_json(analysis, HTTPStatus.ACCEPTED)
+
+    def _receive_video_upload(self) -> Path:
+        filename = urllib.parse.unquote(self.headers.get("X-Filename", ""))
+        suffix = Path(filename).suffix.lower()
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if suffix not in VIDEO_SUFFIXES:
+            self._discard_body(content_length)
+            raise ValueError(f"unsupported video type: {suffix or 'none'}")
+        if content_length <= 0:
+            raise ValueError("uploaded video body is empty")
+        if content_length > MAX_VIDEO_BYTES:
+            self.close_connection = True
+            raise ValueError("uploaded video exceeds the 4 GB local limit")
+        self.server.upload_dir.mkdir(parents=True, exist_ok=True)
+        destination = self.server.upload_dir / f"{uuid4().hex}{suffix}"
+        remaining = content_length
+        try:
+            with destination.open("wb") as handle:
+                while remaining:
+                    chunk = self.rfile.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("uploaded video ended before Content-Length")
+                    handle.write(chunk)
+                    remaining -= len(chunk)
+        except ValueError:
+            destination.unlink(missing_ok=True)
+            raise
+        return destination
+
+    def _manual_recognition(self, video: Path, activity_id: str) -> ActivityRecognition:
+        manifest = next(
+            (m for m in self.server.registry.list_activities() if m.activity_id == activity_id),
+            None,
+        )
+        if manifest is None:
+            raise ValueError(f"unknown activity: {activity_id}")
+        return ActivityRecognition(
+            video=str(video),
+            sampled_frames=0,
+            min_score=0.0,
+            min_margin=0.0,
+            min_similarity=-1.0,
+            recognized=True,
+            activity_id=manifest.activity_id,
+            reason=f"{manifest.name} was selected manually; scene recognition was skipped",
+        )
+
+    def _discard_body(self, length: int) -> None:
+        if length > DISCARD_BODY_LIMIT:
+            self.close_connection = True
+            return
+        remaining = max(0, length)
+        while remaining:
+            chunk = self.rfile.read(min(1024 * 1024, remaining))
+            if not chunk:
+                return
+            remaining -= len(chunk)
 
     def _stop(self) -> None:
         runner = self.server.state.get_runner()
@@ -1275,12 +1455,17 @@ class DashboardServer(ThreadingHTTPServer):
         yolo_model: str,
         device: str,
         registry: ActivityRegistry | None = None,
+        recognizer: Callable[[ActivityRegistry, Path], ActivityRecognition] = recognize_activity,
+        upload_dir: Path | None = None,
     ) -> None:
         super().__init__(address, DashboardHandler)
         self.state = state
         self.yolo_model = yolo_model
         self.device = device
+        self.filter_default_classes = True
         self.registry = registry or ActivityRegistry()
+        self.recognizer = recognizer
+        self.upload_dir = upload_dir or logs_dir() / "uploads"
         self.dataset_jobs = DatasetJobManager(self.registry)
         self.training_jobs = TrainingJobManager(self.registry)
         self.evaluation_jobs = EvaluationJobManager(self.registry)

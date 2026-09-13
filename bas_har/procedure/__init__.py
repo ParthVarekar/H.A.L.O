@@ -18,6 +18,7 @@ from bas_har.procedure.events import JsonlEventSink, make_utc_now
 from bas_har.procedure.evidence import (
     EvidenceAccumulator,
     EvidenceVerdict,
+    perception_needs,
     rule_summary,
 )
 from bas_har.procedure.sequence import ColorSequenceTracker, SequenceObservation
@@ -48,5 +49,6 @@ __all__ = [
     "StepSmoother",
     "build_engine",
     "make_utc_now",
+    "perception_needs",
     "rule_summary",
 ]
