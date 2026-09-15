@@ -17,11 +17,19 @@ To run the complete local check:
 
     cmd /c startup.bat test
 
-## Current collaborator task
+To stop everything a launcher started:
 
-The cold_stowage_melfi activity is already imported with its video, eight-step procedure, and
-ground-truth timeline. Its bounding boxes have not yet been annotated. The next collaborator can
-clone this repository and use the Studio to label the MELFI video.
+    close_startup.bat              # closes what startup.bat started
+    close_training_studio.bat      # closes what startup_training_studio.bat started
+
+## Current state (2026-09-15)
+
+`cold_stowage_melfi` now holds the real MELFI video (`slawosz_using_melfi.mp4`, ESA astronaut
+Slawosz stowing a sample during the Ignis mission), replacing the earlier take, which was moved
+intact to its own activity, `studying_cells_lsg`. The owner boxed 55 frames (775 boxes) across 20
+objects — including per-object states (hatch/compartment open-closed, tray in-out, latch
+left-right) and boxes nested inside other boxes — and a detector has been trained and installed.
+Running the video through the dashboard completes all 8 steps in order with no false alerts.
 
 - Claude Code handover: CLAUDE_CODE_HANDOVER.md
 - Dataset progress: dataset_progress.md
@@ -30,10 +38,12 @@ clone this repository and use the Studio to label the MELFI video.
 - Architecture: docs/architecture.md
 - Validation matrix: docs/validation_matrix.md
 - Risk register: docs/risk_register.md
-- Progress log: docs/progress_log.md
+- Progress log: docs/progress_log.md (see Checkpoints 27-32 for the most recent work)
 
 ## Scope notes
 
 The React Studio on port 5767 is authoritative for annotation. The procedure FSM is the primary
-sequence engine. The laptop RTX 5050 target is active; Jetson deployment, 3D HMR, and a learned
-temporal head remain parked.
+sequence engine, now with per-object state (`object_state`) and `inside_of` containment evidence.
+The laptop RTX 5050 target is active; the dashboard runs uploaded video at its own real-time frame
+rate with GPU-accelerated JPEG encoding. Jetson deployment, 3D HMR, and a learned temporal head
+remain parked.

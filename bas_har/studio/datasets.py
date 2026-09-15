@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from bas_har.schema.activity_schema import ActivityId, AnnotationKind, DatasetVersion
+from bas_har.schema.plan_schema import state_class
 from bas_har.studio.annotations import list_annotations
 from bas_har.studio.registry import ActivityRegistry
 from bas_har.studio.takes import list_takes
@@ -33,23 +34,22 @@ def ensure_dataset_config(
     from bas_har.studio.plans import load_activity_plan
 
     plan = load_activity_plan(registry, manifest.activity_id)
-    class_names: list[str] = []
-    for object_spec in plan.objects:
-        for class_name in object_spec.classes:
-            if class_name not in class_names:
-                class_names.append(class_name)
+    class_names = plan.detector_classes()
     if not class_names:
         raise ValueError("activity plan must define at least one detector class")
     dataset_dir = activity_dataset_dir(registry, manifest.activity_id)
     dataset_dir.mkdir(parents=True, exist_ok=True)
     data_path = dataset_dir / "data.yaml"
-    if not data_path.is_file():
+    expected = {index: name for index, name in enumerate(class_names)}
+    if not data_path.is_file() or _class_names(data_path) != {
+        name: index for index, name in expected.items()
+    }:
         payload = {
             "path": ".",
             "train": "images/train",
             "val": "images/val",
             "test": "images/test",
-            "names": {index: name for index, name in enumerate(class_names)},
+            "names": expected,
         }
         data_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return data_path
@@ -141,6 +141,9 @@ def _apply_visual_annotations(
     if not annotations:
         return
     manifest = registry.load(activity_id)
+    from bas_har.studio.plans import load_activity_plan
+
+    class_states = load_activity_plan(registry, manifest.activity_id).class_states()
     takes = {take.take_id: take for take in list_takes(registry, activity_id)}
     data_path = dataset_dir / "data.yaml"
     class_names = _class_names(data_path)
@@ -158,10 +161,9 @@ def _apply_visual_annotations(
         if take is None or take.width is None or take.height is None:
             raise ValueError(f"annotation references take with incomplete metadata: {take_id}")
         for annotation in frame_annotations:
-            if annotation.label not in class_names:
-                raise ValueError(
-                    f"annotation label is not in the activity classes: {annotation.label}"
-                )
+            key = annotation_class(annotation.label, annotation.state, class_states)
+            if key not in class_names:
+                raise ValueError(f"annotation label is not in the activity classes: {key}")
         source = registry.package_dir(manifest.activity_id) / take.filename
         row = _find_frame_row(rows, source, frame_id)
         if row is None:
@@ -176,7 +178,12 @@ def _apply_visual_annotations(
         label_path.parent.mkdir(parents=True, exist_ok=True)
         label_path.write_text(
             "".join(
-                _yolo_row(annotation, class_names, take.width, take.height)
+                _yolo_row(
+                    annotation,
+                    class_names[annotation_class(annotation.label, annotation.state, class_states)],
+                    take.width,
+                    take.height,
+                )
                 for annotation in frame_annotations
             ),
             encoding="utf-8",
@@ -258,7 +265,18 @@ def _extract_manual_frame(
     }
 
 
-def _yolo_row(annotation: Any, class_names: dict[str, int], width: int, height: int) -> str:
+def annotation_class(label: str, state: str | None, class_states: dict[str, list[str]]) -> str:
+    states = class_states.get(label)
+    if not states:
+        if state:
+            raise ValueError(f"class {label!r} has no states but a box is tagged {state!r}")
+        return label
+    if state not in states:
+        raise ValueError(f"box of class {label!r} needs a state from {states}, got {state!r}")
+    return state_class(label, state)
+
+
+def _yolo_row(annotation: Any, class_index: int, width: int, height: int) -> str:
     bbox = annotation.bbox
     if bbox is None:
         raise ValueError("object_box annotation is missing a bounding box")
@@ -266,7 +284,7 @@ def _yolo_row(annotation: Any, class_names: dict[str, int], width: int, height: 
     center_y = (bbox.y1 + bbox.y2) / 2 / height
     box_width = (bbox.x2 - bbox.x1) / width
     box_height = (bbox.y2 - bbox.y1) / height
-    return f"{class_names[annotation.label]} {center_x:.6f} {center_y:.6f} {box_width:.6f} {box_height:.6f}\n"
+    return f"{class_index} {center_x:.6f} {center_y:.6f} {box_width:.6f} {box_height:.6f}\n"
 
 
 def load_dataset_version(
@@ -281,6 +299,7 @@ def load_dataset_version(
 
 __all__ = [
     "activity_dataset_dir",
+    "annotation_class",
     "ensure_dataset_config",
     "load_dataset_version",
     "prepare_activity_dataset",

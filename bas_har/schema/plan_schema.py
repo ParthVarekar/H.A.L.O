@@ -80,17 +80,46 @@ class FiducialConfig(StrictModel):
     size_mm: float = Field(default=120.0, gt=0)
 
 
+STATE_SEPARATOR = "__"
+
+
+def state_class(class_name: str, state: str) -> str:
+    return f"{class_name}{STATE_SEPARATOR}{state}"
+
+
+def base_class(detector_class: str) -> str:
+    return detector_class.split(STATE_SEPARATOR, 1)[0]
+
+
 class ObjectSpec(StrictModel):
     id: ObjectId
     classes: list[str] = Field(min_length=1)
     colors_any: list[str] = Field(default_factory=list)
+    states: list[HoiLabel] = Field(default_factory=list)
 
     @field_validator("classes")
     @classmethod
     def check_classes(cls, value: list[str]) -> list[str]:
         if not all(c.strip() for c in value):
             raise ValueError("classes must be non-empty strings")
-        return [c.lower() for c in value]
+        lowered = [c.lower() for c in value]
+        if any(STATE_SEPARATOR in c for c in lowered):
+            raise ValueError(f"classes must not contain {STATE_SEPARATOR!r}")
+        return lowered
+
+    @field_validator("states")
+    @classmethod
+    def check_states(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("states must be unique")
+        if any(STATE_SEPARATOR in state for state in value):
+            raise ValueError(f"states must not contain {STATE_SEPARATOR!r}")
+        return value
+
+    def detector_classes(self) -> list[str]:
+        if not self.states:
+            return list(self.classes)
+        return [state_class(name, state) for name in self.classes for state in self.states]
 
 
 class EvidenceRule(StrictModel):
@@ -111,6 +140,7 @@ class EvidenceRule(StrictModel):
     label: HoiLabel | None = None
     state: str | None = None
     outside_of: ObjectId | None = None
+    inside_of: ObjectId | None = None
     in_region: RegionId | None = None
     min_frames: int = Field(default=1, ge=1)
 
@@ -214,6 +244,18 @@ class ExperimentPlan(StrictModel):
                         f"step {step.id!r} evidence references unknown "
                         f"outside_of object {rule.outside_of!r}"
                     )
+                if rule.inside_of is not None and rule.inside_of not in object_ids:
+                    raise ValueError(
+                        f"step {step.id!r} evidence references unknown "
+                        f"inside_of object {rule.inside_of!r}"
+                    )
+                if rule.kind == "object_state" and rule.object in object_ids:
+                    states = next(obj.states for obj in self.objects if obj.id == rule.object)
+                    if rule.state not in states:
+                        raise ValueError(
+                            f"step {step.id!r} evidence state {rule.state!r} is not one of "
+                            f"object {rule.object!r} states {states}"
+                        )
                 if rule.in_region is not None and rule.in_region not in region_ids:
                     raise ValueError(
                         f"step {step.id!r} evidence references unknown region {rule.in_region!r}"
@@ -254,3 +296,20 @@ class ExperimentPlan(StrictModel):
     @property
     def objects_dict(self) -> dict[str, ObjectSpec]:
         return {obj.id: obj for obj in self.objects}
+
+    def detector_classes(self) -> list[str]:
+        names: list[str] = []
+        for obj in self.objects:
+            for name in obj.detector_classes():
+                if name not in names:
+                    names.append(name)
+        return names
+
+    def class_states(self) -> dict[str, list[str]]:
+        states: dict[str, list[str]] = {}
+        for obj in self.objects:
+            for name in obj.classes:
+                for state in obj.states:
+                    if state not in states.setdefault(name, []):
+                        states[name].append(state)
+        return states

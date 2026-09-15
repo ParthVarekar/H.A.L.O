@@ -1,15 +1,15 @@
 id: cold_stowage_melfi
-name: Cold Stowage and MELFI Overview
-version: 0.3.0
+name: MELFI Sample Stowage (Ignis)
+version: 1.1.0
 author: local
-created: ''
-description: 'Overview of Cold Stowage/MELFI-context video content. Revised 2026-09-13:
-  melfi_freezer, dewar_compartment, and control_panel were removed because no footage
-  in this take supports them -- visual inspection during annotation found the 30-100s
-  window is actually the Life Sciences Glovebox (LSG), confirmed by its own on-screen
-  label, not MELFI hardware. Added life_sciences_glovebox to reflect what the take
-  genuinely shows. Revised 2026-09-14: removed the title-card step and the title_card/nasa_logo
-  objects, which never appear in this take.'
+created: '2026-09-14'
+description: 'ESA astronaut Slawosz (Ignis mission) stores a sample pouch in MELFI, the ESA-built minus-eighty-degree
+  lab freezer on the ISS. MELFI has four 75 L dewars; each dewar has four trays and each tray has two
+  compartments. Numbering follows quadrants as seen facing MELFI: 1 top-right, 2 top-left, 3 bottom-left,
+  4 bottom-right (the same convention for trays, looking into the open dewar). Compartment 1 is the one
+  closest to the hatch. Box every visible dewar, tray and compartment, including objects inside other
+  boxes. Tag hatches and compartments open/closed, trays in/out, and dewar latches left (closed) or right
+  (open).'
 camera:
   source: 0
   fps: 25
@@ -18,91 +18,190 @@ camera:
   - 432
 fiducial:
   type: none
-  family: tag36h11
-  size_mm: 120.0
 objects:
-- id: interviewee_1
+- id: sample
   classes:
-  - interviewee
-  colors_any: []
-- id: sample_container
+  - sample
+- id: melfi_freezer
   classes:
-  - sample_container
-  colors_any: []
-- id: life_sciences_glovebox
+  - melfi_freezer
+- id: dewar_1
   classes:
-  - life_sciences_glovebox
-  colors_any: []
-- id: astronaut_1
+  - dewar_1
+- id: dewar_2
   classes:
-  - astronaut
-  colors_any: []
-- id: computer
+  - dewar_2
+- id: dewar_3
   classes:
-  - computer
-  colors_any: []
-- id: esa_logo
+  - dewar_3
+- id: dewar_4
   classes:
-  - esa_logo
-  colors_any: []
+  - dewar_4
+- id: dewar_latch
+  classes:
+  - dewar_latch
+  states:
+  - left
+  - right
+- id: dewar_hatch
+  classes:
+  - dewar_hatch
+  states:
+  - open
+  - closed
+- id: tray_1
+  classes:
+  - tray_1
+  states:
+  - in
+  - out
+- id: tray_2
+  classes:
+  - tray_2
+  states:
+  - in
+  - out
+- id: tray_3
+  classes:
+  - tray_3
+  states:
+  - in
+  - out
+- id: tray_4
+  classes:
+  - tray_4
+  states:
+  - in
+  - out
+- id: compartment_1
+  classes:
+  - compartment_1
+  states:
+  - open
+  - closed
+- id: compartment_2
+  classes:
+  - compartment_2
+  states:
+  - open
+  - closed
+- id: compartment_knob
+  classes:
+  - compartment_knob
+- id: astronaut_slawosz
+  classes:
+  - astronaut_slawosz
+- id: astronaut_other
+  classes:
+  - astronaut_other
+- id: ice_vapor
+  classes:
+  - ice_vapor
+- id: fabric
+  classes:
+  - fabric
+- id: logo
+  classes:
+  - logo
 regions: []
 region_geometries: {}
 steps:
-- id: step_002
-  description: Interviewee explains Cold Stowage and MELFI.
-  evidence:
-  - kind: actor_visible
-    object: null
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
-  next:
-  - step_003
-  timeout_s: 60.0
-  expected_duration_s: 40.0
-- id: step_003
-  description: Life Sciences Glovebox (LSG) is shown in close-up use.
+- id: step_01
+  description: Slawosz holds the sample pouch in front of MELFI.
   evidence:
   - kind: object_visible
-    object: life_sciences_glovebox
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
+    object: sample
     min_frames: 5
   next:
-  - step_004
-  timeout_s: 60.0
-  expected_duration_s: 60.0
-- id: step_004
-  description: Astronaut works with visible ISS equipment and a mounted computer.
+  - step_02
+  timeout_s: 60
+  expected_duration_s: 11
+- id: step_02
+  description: Slawosz opens the dewar 1 hatch (latch twisted to the right).
   evidence:
-  - kind: object_visible
-    object: computer
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
+  - kind: object_state
+    object: dewar_hatch
+    state: open
+    min_frames: 15
   next:
-  - step_005
-  timeout_s: 60.0
-  expected_duration_s: 43.0
-- id: step_005
-  description: ESA logo animation appears as the video end card.
+  - step_03
+  timeout_s: 60
+  expected_duration_s: 2
+- id: step_03
+  description: Slawosz pulls tray 2 out of dewar 1.
+  evidence:
+  - kind: object_state
+    object: tray_2
+    state: out
+    min_frames: 15
+  next:
+  - step_04
+  timeout_s: 60
+  expected_duration_s: 2
+- id: step_04
+  description: Slawosz opens compartment 1 with its knob.
+  evidence:
+  - kind: object_state
+    object: compartment_1
+    state: open
+    min_frames: 15
+  next:
+  - step_05
+  timeout_s: 60
+  expected_duration_s: 6
+- id: step_05
+  description: Slawosz places the sample inside the open compartment 1.
   evidence:
   - kind: object_visible
-    object: esa_logo
-    label: null
-    state: null
-    outside_of: null
-    in_region: null
-    min_frames: 5
+    object: sample
+    inside_of: compartment_1
+    min_frames: 15
+  - kind: object_state
+    object: compartment_1
+    state: open
+    min_frames: 15
+  next:
+  - step_06
+  timeout_s: 60
+  expected_duration_s: 5
+- id: step_06
+  description: Slawosz closes compartment 1.
+  evidence:
+  - kind: object_state
+    object: compartment_1
+    state: closed
+    min_frames: 15
+  next:
+  - step_07
+  timeout_s: 60
+  expected_duration_s: 2
+- id: step_07
+  description: Slawosz slides tray 2 back into dewar 1.
+  evidence:
+  - kind: object_state
+    object: tray_2
+    state: in
+    min_frames: 15
+  next:
+  - step_08
+  timeout_s: 60
+  expected_duration_s: 8
+- id: step_08
+  description: Slawosz closes the dewar 1 hatch and twists the latch back to the left.
+  evidence:
+  - kind: object_state
+    object: dewar_hatch
+    state: closed
+    inside_of: dewar_1
+    min_frames: 15
+  - kind: object_state
+    object: dewar_latch
+    state: left
+    inside_of: dewar_1
+    min_frames: 15
   next: []
-  timeout_s: 60.0
-  expected_duration_s: 10.0
+  timeout_s: 60
+  expected_duration_s: 9
 alert_policy:
   skip_confidence_threshold: 0.85
   skip_persistence_frames: 5

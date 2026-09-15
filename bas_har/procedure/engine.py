@@ -238,7 +238,23 @@ class ProcedureEngine:
             return []
         steps = self.plan.steps
         current_idx = next(i for i, s in enumerate(steps) if s.id == self._current.id)
-        return list(steps[current_idx + 1 :])
+        return [
+            candidate
+            for offset, candidate in enumerate(steps[current_idx + 1 :], start=current_idx + 1)
+            if not self._state_change_pending(steps[current_idx:offset], candidate)
+        ]
+
+    @staticmethod
+    def _state_change_pending(pending: list[StepSpec], candidate: StepSpec) -> bool:
+        wanted = {
+            (rule.object, rule.state) for rule in candidate.evidence if rule.kind == "object_state"
+        }
+        return any(
+            rule.kind == "object_state"
+            and any(obj == rule.object and state != rule.state for obj, state in wanted)
+            for step in pending
+            for rule in step.evidence
+        )
 
     def _skipped_steps(self) -> list[StepSpec]:
         return [s for s in self.plan.steps if s.id in self._skipped]

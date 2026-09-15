@@ -51,6 +51,16 @@ def save_annotation(
         take.take_id == annotation.take_id for take in list_takes(registry, manifest.activity_id)
     ):
         raise ValueError(f"annotation references unknown take: {annotation.take_id}")
+    plan_path = registry.package_dir(manifest.activity_id) / manifest.plan_path
+    if annotation.bbox is not None and plan_path.is_file():
+        from bas_har.studio.datasets import annotation_class
+        from bas_har.studio.plans import load_activity_plan
+
+        annotation_class(
+            annotation.label,
+            annotation.state,
+            load_activity_plan(registry, manifest.activity_id).class_states(),
+        )
     take = _take(registry, manifest.activity_id, annotation.take_id)
     if take.width is not None and take.height is not None and annotation.bbox is not None:
         bbox = annotation.bbox
@@ -61,6 +71,24 @@ def save_annotation(
     with _WRITE_LOCK, path.open("a", encoding="utf-8") as handle:
         handle.write(annotation.model_dump_json(by_alias=True) + "\n")
     return annotation
+
+
+def delete_annotation(
+    registry: ActivityRegistry,
+    activity_id: ActivityId | str,
+    annotation_id: RecordId | str,
+) -> None:
+    path = annotation_path(registry, activity_id)
+    with _WRITE_LOCK:
+        if not path.is_file():
+            raise FileNotFoundError(f"annotation not found: {annotation_id}")
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        kept = [line for line in lines if json.loads(line).get("id") != annotation_id]
+        if len(kept) == len(lines):
+            raise FileNotFoundError(f"annotation not found: {annotation_id}")
+        temp_path = path.with_suffix(".jsonl.tmp")
+        temp_path.write_text("".join(line + "\n" for line in kept), encoding="utf-8")
+        temp_path.replace(path)
 
 
 def list_keyframes(
@@ -129,6 +157,7 @@ def _take(
 
 __all__ = [
     "annotation_path",
+    "delete_annotation",
     "list_annotations",
     "list_keyframes",
     "read_take_frame",

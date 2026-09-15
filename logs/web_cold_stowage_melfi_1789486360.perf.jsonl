@@ -1,0 +1,2 @@
+{"wall_s": 5.02, "video_s": 5.04, "analysed": 126, "skipped": 0, "display_dropped": 0, "lag_s": 0.022, "timings_ms": {"decode": 0.46, "record": 1.62, "detect": 12.66, "engine": 0.13, "draw": 2.1, "encode": 1.44}}
+{"wall_s": 10.06, "video_s": 10.08, "analysed": 252, "skipped": 0, "display_dropped": 0, "lag_s": 0.023, "timings_ms": {"decode": 0.43, "record": 2.04, "detect": 13.88, "engine": 0.12, "draw": 1.76, "encode": 1.31}}

@@ -1,22 +1,28 @@
 # Training Studio Guide
 
-This guide is for a collaborator who will clone the repository, annotate the second video, and run a reproducible baseline training job.
+Last updated: 2026-09-15
 
-The Training Studio is a local React application backed by the Python service. It is not a cloud labeling service.
+This guide covers using the Training Studio to box a video, train a detector, and check it
+against the video.
+
+The Training Studio is a local React application backed by the Python service. It is not a cloud
+labelling service.
 
 ## What the system does
 
 The project turns an approved procedure into a dataset and detector workflow:
 
-1. A procedure plan defines steps and object classes.
+1. A procedure plan defines steps, object classes, and (optionally) per-object states.
 2. A video is imported as a take with a recording-session ID.
 3. The ground-truth timeline records the expected step at each time range.
 4. Keyframes are generated from the take.
-5. The annotator draws object boxes on selected frames.
+5. The annotator draws object boxes — including boxes nested inside other boxes, and a state for
+   any class that has one (open/closed, in/out, and so on).
 6. The system builds a YOLO-style dataset, checks it, trains a detector, and evaluates it.
 7. Only a passed quality gate and passed evaluation are eligible for release.
 
-The procedure FSM remains the primary sequence engine. A learned temporal head, 3D HMR, Jetson deployment, and microgravity simulation are not part of this workstream.
+The procedure FSM remains the primary sequence engine. A learned temporal head, 3D HMR, Jetson
+deployment, and microgravity simulation are not part of this workstream.
 
 ## Locked project decisions
 
@@ -41,7 +47,7 @@ py -3.11 -m venv .venv
 
 The `voice` extra installs `pyttsx3`. The application can still operate without speech if the local voice backend is unavailable.
 
-## Start the Studio
+## Start and stop the Studio
 
 From the repository root:
 
@@ -49,9 +55,17 @@ From the repository root:
 startup_training_studio.bat
 ```
 
-Open [http://127.0.0.1:5767/?workspace=studio](http://127.0.0.1:5767/?workspace=studio). The launcher builds the React frontend when needed and starts the local service. Existing activities are loaded from `activities/`.
+Open [http://127.0.0.1:5767/?workspace=studio](http://127.0.0.1:5767/?workspace=studio). The launcher builds the React frontend when needed and starts (or reuses) the local service. Existing activities are loaded from `activities/`.
 
-To run the full verification suite instead:
+To close the server this launcher started:
+
+```powershell
+close_training_studio.bat
+```
+
+`startup.bat` (the Operations dashboard launcher, and its own checks/training/analyze commands) has its own matching `close_startup.bat`. Each close script only stops the processes its matching launcher started; add `--list` to either close script to see what it would stop without stopping anything.
+
+To run the full verification suite instead of the Studio:
 
 ```powershell
 cmd /c startup.bat test
@@ -59,37 +73,32 @@ cmd /c startup.bat test
 
 Expected result: all tests pass, Ruff passes, formatting is clean, the demo plan validates, and the React smoke check passes.
 
-## MELFI activity to use
-
-Open activity `cold_stowage_melfi`, then select take `studying_cells_in_space-c2dce8af89`. It is already stored in the repository and has these exact properties:
-
-- 153.04 seconds
-- approximately 25.0065 FPS
-- 768 x 432 pixels
-- recording session `cold_stowage_melfi_session_001`
-- 8 timeline records covering the full video
-- 10 plan object classes
-- 0 annotations at handoff
-
 ## Studio workflow
 
 ### STEP 01 — Approved procedure
 
-Confirm that the selected activity is `cold_stowage_melfi`. Review the step titles, time ranges, and object classes. Do not change the schema or remove classes just to make annotation faster. If a class is genuinely not visible anywhere, record that as a plan-quality issue for review.
+Choose an activity from the registry. Review the step titles, evidence rules, and object classes.
+Steps can use `object_visible`, `object_state`, `hand_object_interaction`, `actor_visible`, or
+`object_location` evidence; `object_state` and `inside_of` need the object's `states` list (or the
+container object) to already be entered in the objects table above. Keep each step to one
+observable change — bundling several actions ("opens the hatch, pulls the tray, opens the
+compartment") into one step makes the checker unable to tell which action actually happened.
 
 ### STEP 02 — Training videos
 
-Confirm the selected take and recording session. Do not create a duplicate take when the existing MELFI take is already listed. For future videos, use a new unique recording-session ID even when the experiment is the same.
+Upload the take and give it a recording-session ID. Do not create a duplicate take when the video
+is already listed. Use a new unique recording-session ID for every additional video, even for the
+same activity.
 
 ### STEP 03 — Ground truth timeline
 
-The MELFI timeline is already filled with eight contiguous records. Verify that the times align with the video. Timeline CSV imports use:
+Import a CSV with these columns:
 
 ```text
 id,take_id,start_s,end_s,expected_step_id,observed_action,result,object_ids,region_ids,notes
 ```
 
-Valid result values are `completed`, `incomplete`, `incorrect`, `skipped`, `out_of_order`, and `uncertain`.
+Valid result values are `completed`, `incomplete`, `incorrect`, `skipped`, `out_of_order`, and `uncertain`. For a plan whose steps are single state changes, the most reliable way to fill in the times is to box first, then look at when each state's boxes change from one value to the other and use those times.
 
 ### STEP 04 — Prepare and train
 
@@ -105,40 +114,30 @@ The available presets are:
 
 Use `auto` device selection. It resolves to CUDA when PyTorch can see the GPU. `nvidia-smi` is useful for checking that the process is using the RTX 5050. A GPU name shown in the UI is not, by itself, proof that training is actively using CUDA.
 
+**The Studio's "Start laptop-safe training" button mirrors images left-right by default (Ultralytics' `fliplr` default).** This is fine for symmetric activities, but wrong for any plan with quadrant-numbered objects (dewar/tray 1-4) or left/right states (a latch), because a flipped image teaches the model the wrong side. For such a plan, train from a script instead, passing `fliplr=0` (and, if the state also depends on up/down orientation, `flipud=0`) to `ultralytics.YOLO(...).train(...)`. This has not yet been wired into the Studio button itself.
+
 ### STEP 05 — Assist frame annotation
 
-1. Select the MELFI take.
-2. Set the sampling interval to `40` frames. This gives approximately 1.6-second spacing and covers the 153-second video within the current 120-keyframe limit.
-3. Generate or load the keyframes.
-4. Choose a class from the object selector.
-5. Drag a tight box around each visible instance of that class.
-6. Add additional boxes on the same frame when multiple instances are visible.
-7. Press `Enter` or click `Save & next frame`. The next frame is brought forward automatically.
-8. Use the frame dropdown to revisit a frame. The dropdown is intentionally dark/high-contrast and does not require horizontal scrolling.
-9. If a frame has no instance of a selected class, do not draw a guessed box. Move to the next frame.
-
-The exact visible class names for MELFI are:
-
-```text
-interviewee
-melfi_freezer
-dewar_compartment
-sample_container
-control_panel
-astronaut
-computer
-nasa_logo
-esa_logo
-title_card
-```
-
-Box `melfi_freezer` only when the freezer is visually identifiable. Box `dewar_compartment`, `sample_container`, and `control_panel` only when the corresponding object is visible. Do not label generic ISS equipment as MELFI. Box the interviewee or astronaut when visible, even if the action is an interview or maintenance-like manipulation. Do not label text captions as physical objects.
+1. Select the take.
+2. Set "Sample every frames" (it resets to 30 on page reload; lower it for more frames).
+3. Choose a class from the Label dropdown. If it has states, a State dropdown appears — a box
+   won't save without a state when its class needs one.
+4. Drag a box around each visible instance. Dragging inside a box already on the frame starts a
+   new box, so nested objects (a sample inside an open compartment, inside a tray, inside a
+   dewar) can all be boxed on the same frame.
+5. Save with `Enter` (stay on this frame) or `Shift+Enter` / "Save & next frame" (advance).
+6. Use "Copy boxes from previous frame" to carry over boxes for parts that haven't moved, then
+   redraw or delete only the ones that changed.
+7. The per-frame box list lets you change a box's state, redraw it, or delete it without leaving
+   the frame. Each class gets its own colour; "Show box labels" can be turned off when labels
+   cover small parts.
+8. If a frame has no instance of a class, do not draw a guessed box. Move to the next frame.
 
 ### STEP 06 — Quality gate and evaluation
 
 Run the quality gate after saving annotations. It should confirm:
 
-- every required class has coverage;
+- every required class (each class+state pair, for stateful objects) has coverage;
 - annotations are valid and within image bounds;
 - train, validation, and test splits are non-empty;
 - splits are separated by recording session;
@@ -148,7 +147,7 @@ If the gate fails because only one session exists, that is expected. Do not trea
 
 ## What good data looks like
 
-The goal is not to draw a box on every frame of the source video. The goal is representative, consistent boxes across camera views, sizes, partial occlusions, motion, lighting, and backgrounds. For a complex space experiment, collect multiple independent sessions and include both normal examples and difficult cases. Keep labels conservative: an uncertain object should be left unlabeled and recorded as an uncertainty rather than guessed.
+The goal is not to draw a box on every frame of the source video. The goal is representative, consistent boxes across camera views, sizes, partial occlusions, motion, lighting, and backgrounds. For a complex space experiment, collect multiple independent sessions and include both normal examples and difficult cases. Keep labels conservative: an uncertain object or state should be left unlabeled and recorded as an uncertainty rather than guessed.
 
 ## Files written by annotation and training
 
@@ -174,20 +173,34 @@ Run:
 nvidia-smi
 ```
 
-If `torch.cuda.is_available()` is false, the installed PyTorch build or NVIDIA driver is the issue; do not hide the fallback. Use `laptop_safe` and verify the resolved device in the job log.
+If `torch.cuda.is_available()` is false, the installed PyTorch build or NVIDIA driver is the issue; do not hide the fallback. Use `laptop_safe` and verify the resolved device in the job log. The Operations dashboard now also shows a red banner if it ever resolves to CPU while an NVIDIA GPU is present.
 
 ### The quality gate fails
 
-Read the report rather than bypassing it. Common causes are missing classes, empty validation/test splits, invalid boxes, duplicate rows, or only one recording session. Fix the data or plan, then regenerate the dataset.
+Read the report rather than bypassing it. Common causes are missing classes (or missing states for a class), empty validation/test splits, invalid boxes, duplicate rows, or only one recording session. Fix the data or plan, then regenerate the dataset.
+
+### The Operations dashboard looked slow or laggy
+
+This was a real bug (Checkpoint 31): uploaded video used to run far slower than real time because
+decoding, detection, drawing, JPEG encoding, and the browser stream all shared one thread. It's now
+split into separate analysis, presenter, and recorder threads, uploaded video is paced to its own
+frame rate, and the stream pushes frames instead of polling. If it looks slow again, check the
+dashboard's own speed readout (real-time factor, device, per-stage milliseconds) before assuming
+it's the same issue.
 
 ### The browser looks stale
 
-Restart `startup_training_studio.bat`, reload the page, and verify that the backend is reachable at `http://127.0.0.1:5767/health`.
+Restart `startup_training_studio.bat`, reload the page, and verify that the backend is reachable at `http://127.0.0.1:5767/api/health`.
 
 ## AI coding-tool instructions
 
-Before changing code, read `HANDOVER.md`, `AGENTS.md`, `docs/architecture.md`, `docs/validation_matrix.md`, `docs/risk_register.md`, `bas_har/schema/plan_schema.py`, `bas_har/procedure/engine.py`, and the React Studio files. Follow the schema-first design. Do not change the demo, edge target, or parked phases without asking the project owner. Do not add code comments. Run `cmd /c startup.bat test` before handoff and leave both tests and Ruff clean.
+Before changing code, read `HANDOVER.md`, `CLAUDE_CODE_HANDOVER.md`, `AGENTS.md`, `docs/architecture.md`, `docs/validation_matrix.md`, `docs/risk_register.md`, `bas_har/schema/plan_schema.py`, `bas_har/procedure/engine.py`, `bas_har/procedure/evidence.py`, and the React Studio files. Follow the schema-first design. Do not change the demo, edge target, or parked phases without asking the project owner. Do not add code comments. Run `cmd /c startup.bat test` before handoff and leave both tests and Ruff clean.
 
 ## Current handoff
 
-The collaborator's immediate job is to box the MELFI video. No MELFI annotations or model training have been completed yet. After annotation, the next engineering checkpoint is a quality-gate report, followed by a `laptop_safe` CUDA baseline and an evaluation report. The existing Concrete Hardening activity is a reference dataset, not evidence of production accuracy.
+The MELFI activity (`cold_stowage_melfi`) is boxed (775 boxes, 55 frames), trained, and verified:
+all 8 steps complete in order on the source video with no false alerts, at real playback speed.
+The next real work is a second independent MELFI recording session before any generalisation claim,
+and the ice-vapour/fabric issue alerts, which the owner will ask for when ready. The Concrete
+Hardening and Studying Cells in Space (formerly the MELFI activity's placeholder take) activities
+are reference data only, not evidence of production accuracy for those experiments.

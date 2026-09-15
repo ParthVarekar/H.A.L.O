@@ -1,10 +1,11 @@
 id: cold_stowage_melfi
-name: Cold Stowage and MELFI Operations
+name: MELFI Sample Stowage (Ignis)
 kind: experiment
 version: 0.1.0
 author: local
-description: A video-grounded procedure package for Cold Stowage and MELFI-related
-  sample-storage operations.
+description: 'ESA astronaut Slawosz stores a sample pouch in MELFI during the Ignis
+  mission: opens dewar 1, pulls tray 2, opens compartment 1, places the sample, then
+  closes everything.'
 plan_path: plan.yaml
 camera_profile: default
 lifecycle: imported

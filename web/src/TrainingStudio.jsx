@@ -23,6 +23,8 @@ const EMPTY_STEP = {
   object: "",
   label: "",
   state: "",
+  inside_of: "",
+  extra_evidence: [],
   min_frames: 5,
   timeout_s: 60,
   expected_duration_s: 5,
@@ -35,6 +37,12 @@ const EMPTY_PROCEDURE = {
   objects: [],
   steps: [],
 };
+
+function classColor(label) {
+  let hash = 0;
+  for (const character of label || "") hash = (hash * 31 + character.charCodeAt(0)) % 360;
+  return `hsl(${hash}, 85%, 58%)`;
+}
 
 async function readJson(path, options) {
   const response = await fetch(path, options);
@@ -65,6 +73,10 @@ function TrainingStudio() {
   const [activeFrame, setActiveFrame] = useState(null);
   const [frameEvery, setFrameEvery] = useState(30);
   const [annotationLabel, setAnnotationLabel] = useState("");
+  const [annotationState, setAnnotationState] = useState("");
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState("");
+  const [showBoxLabels, setShowBoxLabels] = useState(true);
+  const [loadedPlan, setLoadedPlan] = useState(null);
   const [draftBox, setDraftBox] = useState(null);
   const [dragStart, setDragStart] = useState(null);
   const [hardware, setHardware] = useState(null);
@@ -131,6 +143,7 @@ function TrainingStudio() {
       .then((plan) => {
         if (!active) return;
         setProcedureExists(true);
+        setLoadedPlan(plan);
         setProcedure({
           name: plan.name,
           description: plan.description || "",
@@ -138,6 +151,7 @@ function TrainingStudio() {
             id: object.id,
             classes: object.classes.join(", "),
             colors_any: (object.colors_any || []).join(", "),
+            states: (object.states || []).join(", "),
           })),
           steps: (plan.steps || []).map((step) => {
             const rule = step.evidence[0] || {};
@@ -149,6 +163,8 @@ function TrainingStudio() {
               object: rule.object || "",
               label: rule.label || "",
               state: rule.state || "",
+              inside_of: rule.inside_of || "",
+              extra_evidence: step.evidence.slice(1),
               min_frames: rule.min_frames || 1,
               timeout_s: step.timeout_s || 60,
               expected_duration_s: step.expected_duration_s || 5,
@@ -160,6 +176,7 @@ function TrainingStudio() {
       .catch((requestError) => {
         if (requestError.message.includes("404")) {
           setProcedureExists(false);
+          setLoadedPlan(null);
           const activity = activities.find((item) => item.id === selectedId);
           setProcedure({ ...EMPTY_PROCEDURE, name: activity?.name || "" });
         } else {
@@ -181,7 +198,7 @@ function TrainingStudio() {
     let active = true;
     const activityPath = `/api/activities/${encodeURIComponent(selectedId)}`;
     Promise.all([
-      readJson(`${activityPath}/keyframes?take_id=${encodeURIComponent(selectedTakeId)}&every_frames=${frameEvery}&limit=120`),
+      readJson(`${activityPath}/keyframes?take_id=${encodeURIComponent(selectedTakeId)}&every_frames=${frameEvery}&limit=1000`),
       readJson(`${activityPath}/annotations?take_id=${encodeURIComponent(selectedTakeId)}`),
     ])
       .then(([nextFrames, nextAnnotations]) => {
@@ -328,7 +345,7 @@ function TrainingStudio() {
       ...current,
       objects: [
         ...current.objects,
-        { id: `object_${current.objects.length + 1}`, classes: "", colors_any: "" },
+        { id: `object_${current.objects.length + 1}`, classes: "", colors_any: "", states: "" },
       ],
     }));
   }
@@ -399,18 +416,20 @@ function TrainingStudio() {
       const plan = {
         id: selectedId,
         name: procedure.name || selected.name,
-        version: "0.1.0",
-        author: "local",
+        version: loadedPlan?.version || "0.1.0",
+        author: loadedPlan?.author || "local",
+        created: loadedPlan?.created || "",
         description: procedure.description,
-        camera: { source: 0, fps: 30, resolution: [1280, 720] },
-        fiducial: { type: "none" },
+        camera: loadedPlan?.camera || { source: 0, fps: 30, resolution: [1280, 720] },
+        fiducial: loadedPlan?.fiducial || { type: "none" },
         objects: procedure.objects.map((object) => ({
           id: object.id,
           classes: splitValues(object.classes),
           colors_any: splitValues(object.colors_any),
+          states: splitValues(object.states || ""),
         })),
-        regions: [],
-        region_geometries: {},
+        regions: loadedPlan?.regions || [],
+        region_geometries: loadedPlan?.region_geometries || {},
         steps: procedure.steps.map((step) => ({
           id: step.id,
           description: step.description,
@@ -419,13 +438,14 @@ function TrainingStudio() {
             ...(step.object ? { object: step.object } : {}),
             ...(step.label ? { label: step.label } : {}),
             ...(step.state ? { state: step.state } : {}),
+            ...(step.inside_of ? { inside_of: step.inside_of } : {}),
             min_frames: Number(step.min_frames) || 1,
-          }],
+          }, ...(step.extra_evidence || [])],
           next: splitValues(step.next),
           timeout_s: Number(step.timeout_s) || 60,
           expected_duration_s: Number(step.expected_duration_s) || 5,
         })),
-        alert_policy: {
+        alert_policy: loadedPlan?.alert_policy || {
           skip_confidence_threshold: 0.85,
           skip_persistence_frames: 5,
           rate_limit_s: 5,
@@ -433,11 +453,12 @@ function TrainingStudio() {
           pause_tolerance_s: 30,
         },
       };
-      await readJson(`/api/activities/${encodeURIComponent(selectedId)}/plan`, {
+      const saved = await readJson(`/api/activities/${encodeURIComponent(selectedId)}/plan`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(plan),
       });
+      setLoadedPlan(saved);
       setProcedureExists(true);
       setMessage("Procedure validated and saved to the activity package.");
       await refresh();
@@ -536,26 +557,45 @@ function TrainingStudio() {
     }
   }
 
+  async function postAnnotation(payload) {
+    const saved = await readJson(`/api/activities/${encodeURIComponent(selectedId)}/annotations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setAnnotations((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+    return saved;
+  }
+
+  function describeAnnotation(annotation) {
+    return annotation.state ? `${annotation.label} · ${annotation.state}` : annotation.label;
+  }
+
   async function saveFrameAnnotation(advance) {
     if (!selectedId || !selectedTakeId || !activeFrame || !draftBox) return;
+    const replacing = annotations.find((item) => item.id === selectedAnnotationId && item.frame_id === activeFrame.frame_id);
+    const label = replacing ? replacing.label : annotationLabel || detectorClasses[0] || "object";
+    const states = classStates[label] || [];
+    const state = replacing ? replacing.state : annotationState;
+    if (states.length && !states.includes(state)) {
+      setError(`Choose a state for ${label}: ${states.join(" or ")}.`);
+      return;
+    }
     setProcedureBusy(true);
     setError("");
     try {
-      const saved = await readJson(`/api/activities/${encodeURIComponent(selectedId)}/annotations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: `annotation-${Date.now()}`,
-          take_id: selectedTakeId,
-          frame_id: activeFrame.frame_id,
-          time_s: activeFrame.time_s,
-          kind: "object_box",
-          label: annotationLabel || detectorClasses[0] || "object",
-          bbox: draftBox,
-          source: "human",
-        }),
+      const saved = await postAnnotation({
+        id: replacing ? replacing.id : `annotation-${Date.now()}`,
+        take_id: selectedTakeId,
+        frame_id: activeFrame.frame_id,
+        time_s: activeFrame.time_s,
+        kind: "object_box",
+        label,
+        bbox: draftBox,
+        ...(states.length ? { state } : {}),
+        source: "human",
       });
-      setAnnotations((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+      setSelectedAnnotationId("");
       setDraftBox(null);
       setDragStart(null);
       if (advance) {
@@ -563,13 +603,72 @@ function TrainingStudio() {
         const nextFrame = keyframes[frameIndex + 1];
         if (nextFrame) {
           setActiveFrame(nextFrame);
-          setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Next frame ${nextFrame.time_s.toFixed(2)}s loaded.`);
+          setMessage(`Saved ${describeAnnotation(saved)} at ${saved.time_s.toFixed(2)}s. Next frame ${nextFrame.time_s.toFixed(2)}s loaded.`);
         } else {
-          setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Final frame complete.`);
+          setMessage(`Saved ${describeAnnotation(saved)} at ${saved.time_s.toFixed(2)}s. Final frame complete.`);
         }
       } else {
-        setMessage(`Saved ${saved.label} at ${saved.time_s.toFixed(2)}s. Draw the next box on this frame, or move on when done.`);
+        setMessage(`Saved ${describeAnnotation(saved)} at ${saved.time_s.toFixed(2)}s. Draw the next box on this frame, including inside other boxes, or move on when done.`);
       }
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setProcedureBusy(false);
+    }
+  }
+
+  async function changeAnnotationState(annotation, state) {
+    setProcedureBusy(true);
+    setError("");
+    try {
+      const saved = await postAnnotation({ ...annotation, state });
+      setMessage(`${saved.label} is now ${saved.state}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setProcedureBusy(false);
+    }
+  }
+
+  async function deleteAnnotation(annotation) {
+    setProcedureBusy(true);
+    setError("");
+    try {
+      await readJson(`/api/activities/${encodeURIComponent(selectedId)}/annotations/${encodeURIComponent(annotation.id)}`, { method: "DELETE" });
+      setAnnotations((current) => current.filter((item) => item.id !== annotation.id));
+      if (selectedAnnotationId === annotation.id) setSelectedAnnotationId("");
+      setMessage(`Deleted ${describeAnnotation(annotation)}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setProcedureBusy(false);
+    }
+  }
+
+  async function copyPreviousFrameBoxes() {
+    if (!activeFrame) return;
+    const previous = keyframes
+      .filter((frame) => frame.frame_id < activeFrame.frame_id)
+      .reverse()
+      .find((frame) => annotations.some((annotation) => annotation.frame_id === frame.frame_id));
+    if (!previous) {
+      setError("No earlier frame has saved boxes to copy.");
+      return;
+    }
+    setProcedureBusy(true);
+    setError("");
+    try {
+      const source = annotations.filter((annotation) => annotation.frame_id === previous.frame_id);
+      const stamp = Date.now();
+      for (const [index, annotation] of source.entries()) {
+        await postAnnotation({
+          ...annotation,
+          id: `annotation-${stamp}-${index}`,
+          frame_id: activeFrame.frame_id,
+          time_s: activeFrame.time_s,
+        });
+      }
+      setMessage(`Copied ${source.length} box(es) from ${previous.time_s.toFixed(2)}s. Redraw or delete any that moved.`);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -675,6 +774,10 @@ function TrainingStudio() {
   const latestTrainingJob = trainingJobs[trainingJobs.length - 1];
   const latestEvaluationJob = evaluationJobs[evaluationJobs.length - 1];
   const detectorClasses = [...new Set(procedure.objects.flatMap((object) => splitValues(object.classes)))];
+  const classStates = Object.fromEntries(
+    procedure.objects.flatMap((object) => splitValues(object.classes).map((name) => [name, splitValues(object.states || "")])),
+  );
+  const labelStates = classStates[annotationLabel] || [];
   const activeFrameAnnotations = annotations.filter((annotation) => annotation.frame_id === activeFrame?.frame_id);
 
   return (
@@ -758,6 +861,7 @@ function TrainingStudio() {
                     <input value={object.id} onChange={(event) => updateObject(index, "id", event.target.value)} placeholder="logical_object_id" aria-label="Object ID" />
                     <input value={object.classes} onChange={(event) => updateObject(index, "classes", event.target.value)} placeholder="detector_class" aria-label="Detector classes" />
                     <input value={object.colors_any} onChange={(event) => updateObject(index, "colors_any", event.target.value)} placeholder="colors, optional" aria-label="Object colors" />
+                    <input value={object.states || ""} onChange={(event) => updateObject(index, "states", event.target.value)} placeholder="states, e.g. open, closed" aria-label="Object states" />
                     <button className="remove-button" onClick={() => removeObject(index)} type="button">Remove</button>
                   </div>
                 ))}
@@ -778,6 +882,11 @@ function TrainingStudio() {
                       </select>
                       <input value={step.object} onChange={(event) => updateStep(index, "object", event.target.value)} placeholder="object ID" aria-label="Evidence object" />
                       <input value={step.label} onChange={(event) => updateStep(index, "label", event.target.value)} placeholder="action label" aria-label="Evidence label" />
+                    </div>
+                    <div className="builder-row">
+                      <input value={step.state} onChange={(event) => updateStep(index, "state", event.target.value)} placeholder="state, e.g. open" aria-label="Evidence state" />
+                      <input value={step.inside_of} onChange={(event) => updateStep(index, "inside_of", event.target.value)} placeholder="inside of object ID, optional" aria-label="Evidence inside of" />
+                      <span />
                     </div>
                     <div className="builder-row builder-row-small">
                       <input type="number" min="1" value={step.min_frames} onChange={(event) => updateStep(index, "min_frames", event.target.value)} placeholder="min frames" aria-label="Minimum frames" />
@@ -876,9 +985,22 @@ function TrainingStudio() {
                     <input type="number" min="1" max="300" value={frameEvery} onChange={(event) => setFrameEvery(Number(event.target.value) || 30)} />
                   </label>
                   <label>Label
-                    <select value={annotationLabel} onChange={(event) => setAnnotationLabel(event.target.value)}>
+                    <select
+                      value={annotationLabel}
+                      onChange={(event) => {
+                        const label = event.target.value;
+                        const states = classStates[label] || [];
+                        setAnnotationLabel(label);
+                        setAnnotationState((current) => (states.includes(current) ? current : states[0] || ""));
+                      }}
+                    >
                       <option value="">Choose detector class</option>
                       {detectorClasses.map((label) => <option key={label} value={label}>{label}</option>)}
+                    </select>
+                  </label>
+                  <label>State
+                    <select value={annotationState} onChange={(event) => setAnnotationState(event.target.value)} disabled={labelStates.length === 0}>
+                      {labelStates.length === 0 ? <option value="">No states</option> : labelStates.map((state) => <option key={state} value={state}>{state}</option>)}
                     </select>
                   </label>
                   <label>Frame
@@ -903,7 +1025,7 @@ function TrainingStudio() {
                 </div>
                 {activeFrame && (
                   <div className="annotation-editor">
-                    <div className="annotation-image-wrap">
+                    <div className={`annotation-image-wrap ${showBoxLabels ? "" : "hide-labels"}`}>
                       <img
                         src={activeFrame.image_url}
                         alt={`Annotation frame at ${activeFrame.time_s.toFixed(2)} seconds`}
@@ -914,7 +1036,7 @@ function TrainingStudio() {
                         tabIndex="0"
                       />
                       {activeFrameAnnotations.map((annotation) => (
-                        <span className="annotation-box saved" key={annotation.id} style={{ left: `${annotation.bbox.x1 / activeFrame.width * 100}%`, top: `${annotation.bbox.y1 / activeFrame.height * 100}%`, width: `${(annotation.bbox.x2 - annotation.bbox.x1) / activeFrame.width * 100}%`, height: `${(annotation.bbox.y2 - annotation.bbox.y1) / activeFrame.height * 100}%` }}><b>{annotation.label}</b></span>
+                        <span className={`annotation-box saved ${annotation.id === selectedAnnotationId ? "selected" : ""}`} key={annotation.id} style={{ left: `${annotation.bbox.x1 / activeFrame.width * 100}%`, top: `${annotation.bbox.y1 / activeFrame.height * 100}%`, width: `${(annotation.bbox.x2 - annotation.bbox.x1) / activeFrame.width * 100}%`, height: `${(annotation.bbox.y2 - annotation.bbox.y1) / activeFrame.height * 100}%`, borderColor: classColor(annotation.label) }}><b style={{ background: classColor(annotation.label) }}>{describeAnnotation(annotation)}</b></span>
                       ))}
                       {draftBox && <span className="annotation-box draft" style={{ left: `${draftBox.x1 / activeFrame.width * 100}%`, top: `${draftBox.y1 / activeFrame.height * 100}%`, width: `${(draftBox.x2 - draftBox.x1) / activeFrame.width * 100}%`, height: `${(draftBox.y2 - draftBox.y1) / activeFrame.height * 100}%` }} />}
                     </div>
@@ -923,7 +1045,31 @@ function TrainingStudio() {
                       <button className="button" onClick={() => saveFrameAnnotation(false)} disabled={!draftBox || procedureBusy} type="button">Save label</button>
                       <button className="button button-primary" onClick={() => saveFrameAnnotation(true)} disabled={!draftBox || procedureBusy} type="button">Save &amp; next frame</button>
                       <button className="button" onClick={goToNextFrame} disabled={procedureBusy} type="button">Next frame</button>
+                      <button className="button" onClick={copyPreviousFrameBoxes} disabled={procedureBusy} type="button">Copy boxes from previous frame</button>
+                      <label className="box-label-toggle"><input type="checkbox" checked={showBoxLabels} onChange={(event) => setShowBoxLabels(event.target.checked)} /> Show box labels</label>
                     </div>
+                    {selectedAnnotationId && <div className="notice-banner">Redrawing {describeAnnotation(activeFrameAnnotations.find((item) => item.id === selectedAnnotationId) || { label: "box" })}: drag a new box and press Save label to replace it.</div>}
+                    {activeFrameAnnotations.length > 0 && (
+                      <div className="frame-box-list">
+                        {activeFrameAnnotations.map((annotation) => {
+                          const states = classStates[annotation.label] || [];
+                          return (
+                            <div className={`frame-box-row ${annotation.id === selectedAnnotationId ? "selected" : ""}`} key={annotation.id}>
+                              <i style={{ background: classColor(annotation.label) }} />
+                              <strong>{annotation.label}</strong>
+                              {states.length > 0 ? (
+                                <select value={annotation.state || ""} onChange={(event) => changeAnnotationState(annotation, event.target.value)} disabled={procedureBusy} aria-label={`State of ${annotation.label}`}>
+                                  {!annotation.state && <option value="">needs state</option>}
+                                  {states.map((state) => <option key={state} value={state}>{state}</option>)}
+                                </select>
+                              ) : <span />}
+                              <button className="text-button" onClick={() => setSelectedAnnotationId((current) => (current === annotation.id ? "" : annotation.id))} type="button">{annotation.id === selectedAnnotationId ? "Cancel redraw" : "Redraw"}</button>
+                              <button className="remove-button" onClick={() => deleteAnnotation(annotation)} disabled={procedureBusy} type="button">Delete</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
                 {keyframes.length === 0 && <div className="studio-empty">Upload a take to load sampled keyframes.</div>}

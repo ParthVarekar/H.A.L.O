@@ -1,6 +1,7 @@
 # Claude Code Handover — bas-har
 
-Last updated: 2026-09-13
+Last updated: 2026-09-15 (see Section 19 for the current state; Sections 1-18 predate the real
+MELFI video and are retained for historical context)
 
 This is the authoritative continuation brief for Claude Code or another coding agent taking over
 the repository. It records the project intent, current implementation, exact data state, verified
@@ -13,9 +14,9 @@ the source of truth.
 - Local path: C:\Users\Parth\Desktop\HAR_for_BAS
 - GitHub remote: https://github.com/ParthVarekar/HAR_for_BAS.git
 - Active branch: main
-- Last known commit: 1a96e69, docs: prepare collaborator training handoff
-- Last known remote branch: origin/main at 1a96e69
-- Working tree at handoff: clean
+- Last known commit (per `git log`): d0686d3, feat: trained on three vids
+- Working tree at last full check: has uncommitted MELFI/streaming/voice work — see Section 19;
+  the owner has not asked for a commit
 - Application: React Training Studio plus Python HAR service
 - Studio URL: http://127.0.0.1:5767/?workspace=studio
 - Project mission: SIH26174 AI human activity recognition for on-board Bharatiya Antariksh
@@ -23,16 +24,17 @@ the source of truth.
 
 The project is not production-ready. It is an MVP and research/prototype pipeline with a working
 schema, procedure engine, React annotation studio, replay/live service, dataset preparation,
-quality gates, and training/evaluation plumbing. There is no trustworthy trained detector for the
-MELFI activity yet.
+quality gates, and training/evaluation plumbing. As of Section 19, the MELFI activity has a real
+video, real boxes, and a trained detector that completes all 8 steps on its own source video, but
+this is not yet evidence of generalisation to a different recording.
 
-## 2. What the owner wants next
+## 2. What the owner wants next (as of Section 19)
 
-The owner is handing the repository to a friend or coding agent so the friend can annotate the
-second video. The second video is the Cold Stowage/MELFI video already stored in the repository.
-The immediate human task is drawing bounding boxes in the React Studio. The immediate engineering
-task after labels exist is quality-gate verification, session-level dataset preparation, CUDA
-baseline training, and held-out evaluation.
+The owner boxes the MELFI video themselves — there is no "hand this to a friend" workflow anymore
+(see Section 19). Do not box `cold_stowage_melfi` on the owner's behalf unless explicitly asked
+again. The immediate next real work is a second independent MELFI recording session, and the
+ice-vapour/fabric issue alerts (deferred; the owner will say when to start them). Sections 2-18
+below describe the earlier "hand to a collaborator" plan and are historical only.
 
 Do not start by redesigning the system. First preserve the current activity data, verify the
 annotation workflow, and record every new result in this document and docs/progress_log.md.
@@ -416,9 +418,10 @@ Not finished and deliberately parked:
 - final trained-model packaging asset.
 
 Generic evidence gaps noted in the architecture plan may still require work before complex
-activities can be approved: offline/replay hardening, generic package evidence adapters, and
-object_state support. Do not implement activity-specific shortcuts as a substitute for those
-generic contracts.
+activities can be approved: offline/replay hardening and generic package evidence adapters.
+`object_state` support (and the `inside_of` containment rule) is now implemented — see Section 19
+— and used by the MELFI plan. Do not implement activity-specific shortcuts as a substitute for
+those generic contracts.
 
 ## 15. Known risks and traps
 
@@ -511,3 +514,112 @@ The MELFI milestone is not complete until all of the following are recorded:
 - progress log and this handoff contain exact counts, paths, commands, and commit.
 
 Until then, the correct status is staged for annotation, not production-ready.
+
+## 19. Current state — 2026-09-15 (supersedes Sections 2, 10, 14-18 for MELFI)
+
+Everything above this section describes the repository before the owner supplied the real MELFI
+video and its context on 2026-09-14/15. Full detail, in order, is `docs/progress_log.md`
+Checkpoints 27-32. Summary:
+
+**The video changed.** The take described in Sections 10 and 14-17
+(`studying_cells_in_space-c2dce8af89`, an interview plus Life Sciences Glovebox footage) was never
+MELFI hardware. It was moved intact — video, 70 boxes, timeline, dataset, and its trained detector
+— to a new activity, `studying_cells_lsg`, kept as a reference for a later broad-video showcase.
+`cold_stowage_melfi` was cleared and now holds the real video the owner described:
+`slawosz_using_melfi-8821822197.mp4` (67.16 s, 25 fps, 768x432, session
+`melfi_ignis_session_001`): ESA astronaut Slawosz stores a sample pouch in MELFI during the Ignis
+mission.
+
+**The schema gained two owner-approved features.** `ObjectSpec.states` (a list like `["open",
+"closed"]`) expands each class into per-state detector classes via `state_class`/`base_class`
+helpers and `ObjectSpec.detector_classes()` / `ExperimentPlan.detector_classes()` /
+`ExperimentPlan.class_states()`; the annotation `state` field carries this on each box, and dataset
+preparation (`bas_har/studio/datasets.py::annotation_class`) maps label+state to the right YOLO
+class, rewriting `data.yaml` whenever the plan's classes change (fixing a stale-class-list bug).
+`EvidenceRule.inside_of` mirrors the existing `outside_of` (`bas_har/procedure/evidence.py`,
+`INSIDE_MIN_FRACTION = 0.8`) so a step can require one box mostly inside another, e.g. "sample
+inside the open compartment".
+
+**The new plan (v1.1.0) has 20 objects and 8 steps**, each one observable state change (earlier
+drafts had bundled several actions per step; that was split apart after the first test run showed
+it made the checker unable to tell which action happened): sample, melfi_freezer, dewar_1..4,
+dewar_latch (states left/right), dewar_hatch (open/closed), tray_1..4 (in/out), compartment_1/2
+(open/closed), compartment_knob, astronaut_slawosz, astronaut_other, ice_vapor, fabric, logo.
+Quadrant numbering, confirmed against the video: 1 top-right, 2 top-left, 3 bottom-left, 4
+bottom-right, facing the open MELFI door.
+
+**The owner boxed the video themselves**: 775 boxes across 55 frames. Claude Code did not draw any
+of these boxes — the owner explicitly said they would do the boxing and Claude Code should only
+set up the Studio. The Studio gained, to support this: a state picker tied to the selected class; a
+per-frame box list with redraw/change-state/delete; per-class colours; a show/hide box-labels
+toggle; "copy boxes from previous frame"; and `DELETE
+/api/activities/<id>/annotations/<annotation_id>` (`bas_har/studio/annotations.py::delete_annotation`).
+Drawing a new box always starts fresh even when the drag begins inside an existing box, so nested
+objects (sample inside compartment inside tray inside dewar) were already boxable — the earlier gap
+was in labelling coverage, not the drawing tool.
+
+**A detector was trained after the owner's explicit go-ahead**: yolo11n, image size 768, trained
+with `fliplr=0`/`flipud=0` (mirroring would swap dewar/tray quadrant numbers and the latch's
+left/right state — this is NOT the Studio's own "Start laptop-safe training" button, which still
+mirrors by default and should not be used for this activity until that's fixed). Held-out run (44
+train / 11 held-out frames): mAP50 0.79, weak on `sample` and `compartment_knob`. The installed
+model (`activities/cold_stowage_melfi/models/detector.pt`) was retrained on all 55 boxed frames, so
+its own metrics are not a fair held-out score.
+
+**Checker bugs were found and fixed by testing on the real video, not by inspection**:
+1. Two boxes of the same base class in different states overlapping (e.g. `compartment_1__open`
+   and `compartment_1__closed` both detected on one frame) let the wrong state win by luck of which
+   rule ran first; fixed by keeping only the higher-confidence one per frame
+   (`resolve_state_conflicts`, IoU >= 0.5).
+2. Step completion and skip confirmation both required consecutive matching frames; a single
+   dropped frame or false positive flipped the result. Both now require the evidence in >= 80% of
+   a short sliding window (`COMPLETION_RATIO`, `SKIP_CONFIRM_RATIO`) instead of every single frame.
+3. A step whose final state matches its starting state (e.g. hatch closed at both the very start
+   and the very end) was being flagged as "already skipped ahead to" at time zero; the engine now
+   tracks which state-changes are still pending before treating a later step as reachable.
+
+**Verified on the real video** (via `melfi_video_test.py` cached-perception replay and via the live
+dashboard, both by picking the activity manually with the new picker below and via automatic scene
+recognition): all 8 steps complete in order, zero alerts, each within about a second of the
+state-change time visible in the owner's own boxes.
+
+**Playback was measured at about 0.2x real time and is now 1.0x.** `SessionRunner`
+(`bas_har/web/server.py`) is now three threads — analysis (decode/detect/engine, unchanged logic),
+presenter (overlay + JPEG encode from a `LatestSlot`), recorder (MP4 backup via a drop-oldest
+queue, skipped entirely for uploads) — so no viewer or disk work can slow detection. File sources
+are paced to their own frame rate by `PlaybackClock`; the MJPEG stream is push-based
+(`WebState.wait_for_frame` on a `threading.Condition`) instead of polling at 30 Hz; JPEG encoding
+uses nvjpeg via `bas_har/web/frame_encoder.py` with an OpenCV fallback; the detector warms up
+before playback starts. Status now exposes `realtime_factor`, `lag_s`, `timings_ms`, `display_fps`,
+`encoder`, `cpu_fallback`; the dashboard shows a live readout and a red CPU-fallback banner.
+Verified with a real browser attached, started the way `startup.bat` starts it: 1.000x real-time
+factor, 25.0 fps delivered to the stream client (mean gap 40 ms, p95 50 ms), zero frames skipped or
+dropped, unchanged step results.
+
+**Voice alerts went through three fixes, in order**: (1) merged into short phrases at a faster
+rate because a full sentence per step fell behind when steps completed close together (the queue is
+now capped and duplicate/adjacent completions are merged, e.g. "Steps 5 and 6 done."); (2) found to
+be completely silent afterward because the in-app browser pane still had a test speech-recorder
+mock installed from timing verification, and because the server's own `winsound` beep isn't
+guaranteed audible when the server runs in a background shell — fixed by removing the mock and
+adding the dashboard's own Web Audio tones (a beep per step, a double tone for alerts) so sound
+doesn't depend on the server process; (3) sped up again on request, now 1.5x rate.
+
+**A manual "Experiment" picker was added** to the Operations dashboard's analyse panel: choosing an
+activity skips scene recognition and monitors it directly (`X-Activity-Id` header on
+`POST /api/analyze`; new `GET /api/analyze/activities`).
+
+**`close_startup.bat` and `close_training_studio.bat`** were added at the repository root. Each
+stops only the processes its matching launcher (`startup.bat` / `startup_training_studio.bat`)
+started, told apart by the `--no-start` flag only the Studio launcher passes; `--list` previews
+without stopping anything.
+
+**Not yet done**: a second independent MELFI recording session (required before any generalisation
+claim — every current MELFI number is measured on the video the model trained on); the ice-vapour
+and fabric issue alerts (owner said to build these after training, and will say when); wiring
+`fliplr=0` into the Studio's own training button for orientation-sensitive plans generally, not
+just via a one-off script.
+
+**Test suite**: 193 passing (`pytest -q`), Ruff and formatting clean, React build clean, as of this
+section. New test files since Section 18: `tests/test_state_checker.py`,
+`tests/test_web_streaming.py`, `tests/test_frame_encoder.py`.

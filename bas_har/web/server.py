@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import mimetypes
+import queue
 import threading
 import time
 import urllib.parse
@@ -40,6 +42,7 @@ from bas_har.schema.event_schema import EventRecord
 from bas_har.schema.plan_schema import ExperimentPlan
 from bas_har.schema.recognition_schema import ActivityRecognition
 from bas_har.studio.annotations import (
+    delete_annotation,
     list_annotations,
     list_keyframes,
     read_take_frame,
@@ -63,12 +66,133 @@ from bas_har.studio.takes import list_takes, register_take
 from bas_har.studio.timeline import import_timeline, list_timeline
 from bas_har.studio.verification import release_audit_csv, verify_activity_package
 from bas_har.voice import ConfirmationSound
+from bas_har.web.frame_encoder import FrameEncoder
 
 STATIC_DIR = project_root() / "web" / "dist"
 DEFAULT_TARGET_CLASSES = ["box", "cup", "bottle", "bowl", "book", "orange", "banana", "apple"]
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 MAX_VIDEO_BYTES = 4_000_000_000
 DISCARD_BODY_LIMIT = 64_000_000
+MAX_PLAYBACK_LAG_S = 0.5
+RECORDER_QUEUE_FRAMES = 50
+PERF_LOG_INTERVAL_S = 5.0
+STATUS_TIMING_INTERVAL_S = 0.5
+HEADER_HEIGHT = 76
+
+
+def _is_file_source(source: int | str) -> bool:
+    if isinstance(source, int):
+        return False
+    text = str(source)
+    if text.isdigit() or "://" in text:
+        return False
+    return Path(text).suffix.lower() in VIDEO_SUFFIXES
+
+
+def _nvidia_gpu_present() -> bool:
+    try:
+        import pynvml
+    except ImportError:
+        return False
+    try:
+        pynvml.nvmlInit()
+        try:
+            return pynvml.nvmlDeviceGetCount() > 0
+        finally:
+            pynvml.nvmlShutdown()
+    except pynvml.NVMLError:
+        return False
+
+
+def _cpu_fallback(device: str, gpu_present: bool) -> bool:
+    return device == "cpu" and gpu_present
+
+
+class PlaybackClock:
+    """Releases file frames at the video's own frame rate against a wall clock."""
+
+    def __init__(
+        self,
+        fps: float,
+        stop_event: threading.Event,
+        now: Callable[[], float] = time.perf_counter,
+        max_lag_s: float = MAX_PLAYBACK_LAG_S,
+    ) -> None:
+        self.fps = max(fps, 1.0)
+        self.stop_event = stop_event
+        self.now = now
+        self.max_lag_s = max_lag_s
+        self.started: float | None = None
+
+    def start(self) -> None:
+        self.started = self.now()
+
+    def lag_s(self, frame_id: int) -> float:
+        if self.started is None:
+            return 0.0
+        return self.now() - (self.started + frame_id / self.fps)
+
+    def wait_for(self, frame_id: int) -> bool:
+        if self.started is None:
+            self.start()
+        lag = self.lag_s(frame_id)
+        if lag < 0:
+            self.stop_event.wait(-lag)
+            return True
+        return lag <= self.max_lag_s
+
+
+class LatestSlot:
+    """Single-item hand-off where a newer item replaces one not yet taken."""
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._item: Any = None
+        self._closed = False
+        self.dropped = 0
+
+    def put(self, item: Any) -> None:
+        with self._condition:
+            if self._item is not None:
+                self.dropped += 1
+            self._item = item
+            self._condition.notify()
+
+    def take(self, timeout: float = 0.5) -> Any:
+        with self._condition:
+            if self._item is None and not self._closed:
+                self._condition.wait(timeout)
+            item, self._item = self._item, None
+            return item
+
+    def close(self) -> None:
+        with self._condition:
+            self._closed = True
+            self._condition.notify_all()
+
+    @property
+    def closed(self) -> bool:
+        with self._condition:
+            return self._closed and self._item is None
+
+
+class StageTimer:
+    def __init__(self, alpha: float = 0.1) -> None:
+        self.alpha = alpha
+        self._values: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def record(self, stage: str, seconds: float) -> None:
+        value = seconds * 1000.0
+        with self._lock:
+            previous = self._values.get(stage)
+            self._values[stage] = (
+                value if previous is None else previous + self.alpha * (value - previous)
+            )
+
+    def snapshot(self) -> dict[str, float]:
+        with self._lock:
+            return {stage: round(value, 2) for stage, value in self._values.items()}
 
 
 def _source_value(source: int | str) -> int | str:
@@ -191,9 +315,10 @@ def _annotate_frame(
             2,
             cv2.LINE_AA,
         )
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (0, 0), (frame.shape[1], 76), (8, 16, 30), -1)
-    cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+    import numpy as np
+
+    strip = frame[:HEADER_HEIGHT]
+    cv2.addWeighted(np.full_like(strip, (8, 16, 30)), 0.85, strip, 0.15, 0, dst=strip)
     current = description or "Procedure complete"
     cv2.putText(
         frame,
@@ -224,6 +349,7 @@ class WebState:
         self.plan_data = _plan_summary(plan)
         first = plan.steps[0]
         self.lock = threading.RLock()
+        self.frame_ready = threading.Condition(self.lock)
         self.runner: SessionRunner | None = None
         self.frame_jpeg: bytes | None = None
         self.events: list[dict[str, Any]] = []
@@ -252,6 +378,15 @@ class WebState:
             "started_at": None,
             "summary": None,
             "analysis": None,
+            "plan_revision": 0,
+            "realtime": False,
+            "realtime_factor": None,
+            "lag_s": 0.0,
+            "timings_ms": {},
+            "display_fps": 0.0,
+            "encoder": None,
+            "cpu_fallback": False,
+            "falling_behind": False,
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -342,15 +477,28 @@ class WebState:
                 started_at=None,
                 summary=None,
                 analysis=None,
+                plan_revision=int(self.status.get("plan_revision", 0)) + 1,
             )
 
     def set_frame(self, frame_jpeg: bytes, frame_id: int) -> None:
-        with self.lock:
+        with self.frame_ready:
             self.frame_jpeg = frame_jpeg
             self.status["frame_id"] = frame_id
+            self.status["has_frame"] = True
+            self.frame_ready.notify_all()
 
     def frame_snapshot(self) -> tuple[bytes | None, int]:
         with self.lock:
+            return self.frame_jpeg, int(self.status["frame_id"])
+
+    def wait_for_frame(self, last_frame_id: int, timeout: float) -> tuple[bytes | None, int]:
+        with self.frame_ready:
+            self.frame_ready.wait_for(
+                lambda: (
+                    self.frame_jpeg is not None and int(self.status["frame_id"]) != last_frame_id
+                ),
+                timeout,
+            )
             return self.frame_jpeg, int(self.status["frame_id"])
 
 
@@ -364,6 +512,9 @@ class SessionRunner:
         device: str = "auto",
         filter_default_classes: bool = True,
         use_media_time: bool = False,
+        realtime: bool | None = None,
+        record_buffer: bool | None = None,
+        upload: bool = False,
     ) -> None:
         self.state = state
         self.source = source
@@ -372,9 +523,13 @@ class SessionRunner:
         self.device = device
         self.filter_default_classes = filter_default_classes
         self.use_media_time = use_media_time
+        is_file = _is_file_source(source)
+        self.realtime = is_file if realtime is None else realtime
+        self.record_buffer = (not upload) if record_buffer is None else record_buffer
         self.stop_event = threading.Event()
         self.engine: ProcedureEngine | None = None
         self.engine_lock = threading.Lock()
+        self.timer = StageTimer()
         self.thread = threading.Thread(target=self._run, name="bas-har-capture", daemon=True)
 
     def start(self) -> None:
@@ -393,17 +548,76 @@ class SessionRunner:
             if self.engine is not None:
                 self.engine.silence()
 
-    def _run(self) -> None:
-        import cv2
+    def _present(self, slot: LatestSlot, encoder: FrameEncoder) -> None:
+        shown = 0
+        started = time.perf_counter()
+        while not slot.closed:
+            item = slot.take(timeout=0.5)
+            if item is None:
+                continue
+            frame_id, frame, result, state, confidence, description = item
+            began = time.perf_counter()
+            annotated = _annotate_frame(frame, result, state, confidence, description)
+            drawn = time.perf_counter()
+            encoded = encoder.encode(annotated)
+            encoded_at = time.perf_counter()
+            self.timer.record("draw", drawn - began)
+            self.timer.record("encode", encoded_at - drawn)
+            if encoded is not None:
+                self.state.set_frame(encoded, frame_id)
+                shown += 1
+                self.state.update(display_fps=round(shown / max(encoded_at - started, 0.001), 1))
 
+    def _record(self, frames: queue.Queue[Any], buffer_dir: Path, fps: float) -> None:
+        from bas_har.io import Mp4CircularBuffer
+        from bas_har.schema.io_schema import CircularBufferConfig
+
+        buffer: Any | None = None
+        try:
+            while True:
+                frame = frames.get()
+                if frame is None:
+                    break
+                if buffer is None:
+                    frame_height, frame_width = frame.shape[:2]
+                    buffer = Mp4CircularBuffer(
+                        CircularBufferConfig(
+                            directory=buffer_dir,
+                            fps=fps,
+                            resolution=(frame_width, frame_height),
+                        )
+                    )
+                began = time.perf_counter()
+                buffer.write(frame)
+                self.timer.record("record", time.perf_counter() - began)
+        finally:
+            if buffer is not None:
+                buffer.close()
+                self.state.update(buffer_segment_count=len(buffer.paths()))
+
+    @staticmethod
+    def _offer_recording(frames: queue.Queue[Any], frame: Any) -> None:
+        try:
+            frames.put_nowait(frame)
+        except queue.Full:
+            with contextlib.suppress(queue.Empty):
+                frames.get_nowait()
+            with contextlib.suppress(queue.Full):
+                frames.put_nowait(frame)
+
+    def _run(self) -> None:
         from bas_har.io import CrcJsonlEventSink, VideoCaptureSource
         from bas_har.perception import PerceptionPipeline
 
         capture: Any | None = None
-        buffer: Any | None = None
         sink: Any | None = None
         confirmation: ConfirmationSound | None = None
         sequence: ColorSequenceTracker | None = None
+        slot = LatestSlot()
+        presenter: threading.Thread | None = None
+        recorder: threading.Thread | None = None
+        recording: queue.Queue[Any] | None = None
+        perf_handle: Any | None = None
         completed_steps: list[str] = []
         late_steps: list[str] = []
         try:
@@ -417,6 +631,7 @@ class SessionRunner:
             fps = capture.fps or self.state.plan.camera.fps
             log_path = logs_dir() / f"web_{self.state.plan.experiment_id}_{int(time.time())}.jsonl"
             sink = CrcJsonlEventSink(log_path)
+            perf_handle = log_path.with_suffix(".perf.jsonl").open("a", encoding="utf-8")
             confirmation = ConfirmationSound()
             buffer_dir = logs_dir() / "buffer" / self.state.plan.experiment_id
             try:
@@ -437,6 +652,22 @@ class SessionRunner:
                 device=self.device,
                 color_names=_plan_color_names(self.state.plan),
             )
+            encoder = FrameEncoder(device=pipeline.device)
+            self.state.update(message="Warming up the detector")
+            pipeline.warmup(width, height)
+            presenter = threading.Thread(
+                target=self._present, args=(slot, encoder), name="bas-har-present", daemon=True
+            )
+            presenter.start()
+            if self.record_buffer:
+                recording = queue.Queue(maxsize=RECORDER_QUEUE_FRAMES)
+                recorder = threading.Thread(
+                    target=self._record,
+                    args=(recording, buffer_dir, fps),
+                    name="bas-har-record",
+                    daemon=True,
+                )
+                recorder.start()
             self.state.update(
                 running=True,
                 source=str(self.source),
@@ -446,36 +677,50 @@ class SessionRunner:
                 message="Capturing and analyzing",
                 error=None,
                 log_path=str(log_path),
-                buffer_dir=str(buffer_dir),
+                buffer_dir=str(buffer_dir) if self.record_buffer else None,
                 buffer_segment_count=0,
                 device=pipeline.device,
                 recognizer="color_sequence" if sequence is not None else "procedure_engine",
                 has_frame=False,
                 started_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                realtime=self.realtime,
+                realtime_factor=None,
+                lag_s=0.0,
+                timings_ms={},
+                display_fps=0.0,
+                encoder=encoder.backend,
+                cpu_fallback=_cpu_fallback(pipeline.device, _nvidia_gpu_present()),
+                falling_behind=False,
             )
+            clock = PlaybackClock(fps, self.stop_event) if self.realtime else None
             started = time.perf_counter()
+            if clock is not None:
+                clock.start()
             frame_id = 0
+            analysed = 0
+            skipped = 0
+            last_status = 0.0
+            last_perf = started
             while not self.stop_event.is_set():
                 if self.max_frames is not None and frame_id >= self.max_frames:
                     break
+                began = time.perf_counter()
                 ok, frame = capture.read()
                 if not ok:
                     break
-                if buffer is None:
-                    from bas_har.io import Mp4CircularBuffer
-                    from bas_har.schema.io_schema import CircularBufferConfig
-
-                    frame_height, frame_width = frame.shape[:2]
-                    buffer = Mp4CircularBuffer(
-                        CircularBufferConfig(
-                            directory=buffer_dir,
-                            fps=fps,
-                            resolution=(frame_width, frame_height),
-                        )
-                    )
-                buffer.write(frame)
+                decoded = time.perf_counter()
+                self.timer.record("decode", decoded - began)
+                if recording is not None:
+                    self._offer_recording(recording, frame.copy())
+                if clock is not None and not clock.wait_for(frame_id):
+                    skipped += 1
+                    frame_id += 1
+                    continue
                 ts_ms = int(frame_id * 1000 / max(fps, 1.0))
+                detect_began = time.perf_counter()
                 result = pipeline.process(frame, frame_id=frame_id, ts_ms=ts_ms)
+                detected = time.perf_counter()
+                self.timer.record("detect", detected - detect_began)
                 if sequence is not None:
                     with self.engine_lock:
                         observation = sequence.update(result)
@@ -512,42 +757,68 @@ class SessionRunner:
                     display_pause = output.pause_active
                     display_cooldown = output.in_cooldown
                     display_message = "Capturing and analyzing"
+                engine_done = time.perf_counter()
+                self.timer.record("engine", engine_done - detected)
                 current = self.state.plan.steps_dict.get(display_step_id)
                 description = current.description if current is not None else "Procedure complete"
-                encoded_frame = _annotate_frame(
-                    frame, result, display_state, display_confidence, description
-                )
-                encoded_ok, encoded = cv2.imencode(
-                    ".jpg", encoded_frame, [cv2.IMWRITE_JPEG_QUALITY, 82]
-                )
-                if encoded_ok:
-                    self.state.set_frame(encoded.tobytes(), frame_id)
-                elapsed = time.perf_counter() - started
-                self.state.update(
-                    running=True,
-                    frame_id=frame_id,
-                    fps=round((frame_id + 1) / max(elapsed, 0.001), 1),
-                    state=display_state,
-                    current_step_id=display_step_id,
-                    current_step_description=description,
-                    next_step_id=(
+                slot.put((frame_id, frame, result, display_state, display_confidence, description))
+                analysed += 1
+                now = time.perf_counter()
+                elapsed = now - started
+                lag = clock.lag_s(frame_id) if clock is not None else 0.0
+                values: dict[str, Any] = {
+                    "running": True,
+                    "fps": round(analysed / max(elapsed, 0.001), 1),
+                    "state": display_state,
+                    "current_step_id": display_step_id,
+                    "current_step_description": description,
+                    "next_step_id": (
                         current.next[0] if current is not None and current.next else None
                     ),
-                    confidence=round(display_confidence, 3),
-                    pause_active=display_pause,
-                    in_cooldown=display_cooldown,
-                    detections=_detection_dict(result),
-                    buffer_segment_count=len(buffer.paths()),
-                    has_frame=encoded_ok,
-                    message=display_message,
-                )
+                    "confidence": round(display_confidence, 3),
+                    "pause_active": display_pause,
+                    "in_cooldown": display_cooldown,
+                    "detections": _detection_dict(result),
+                    "message": display_message,
+                }
+                if now - last_status >= STATUS_TIMING_INTERVAL_S:
+                    last_status = now
+                    video_s = (frame_id + 1) / max(fps, 1.0)
+                    values.update(
+                        realtime_factor=round(video_s / max(elapsed, 0.001), 2),
+                        lag_s=round(max(0.0, lag), 3),
+                        timings_ms=self.timer.snapshot(),
+                        falling_behind=lag > MAX_PLAYBACK_LAG_S / 2,
+                    )
+                self.state.update(**values)
+                if now - last_perf >= PERF_LOG_INTERVAL_S and perf_handle is not None:
+                    last_perf = now
+                    perf_handle.write(
+                        json.dumps(
+                            {
+                                "wall_s": round(elapsed, 2),
+                                "video_s": round((frame_id + 1) / max(fps, 1.0), 2),
+                                "analysed": analysed,
+                                "skipped": skipped,
+                                "display_dropped": slot.dropped,
+                                "lag_s": round(lag, 3),
+                                "timings_ms": self.timer.snapshot(),
+                            }
+                        )
+                        + "\n"
+                    )
+                    perf_handle.flush()
                 frame_id += 1
         except Exception as exc:
             self.state.update(running=False, message="Capture error", error=str(exc))
         finally:
-            if buffer is not None:
-                buffer.close()
-                self.state.update(buffer_segment_count=len(buffer.paths()))
+            slot.close()
+            if presenter is not None:
+                presenter.join(timeout=5)
+            if recording is not None:
+                recording.put(None)
+            if recorder is not None:
+                recorder.join(timeout=10)
             if capture is not None:
                 capture.close()
             if self.engine is not None:
@@ -555,6 +826,8 @@ class SessionRunner:
                     self.engine.close()
             if sink is not None:
                 sink.close()
+            if perf_handle is not None:
+                perf_handle.close()
             if confirmation is not None:
                 confirmation.shutdown()
             with self.state.lock:
@@ -565,19 +838,27 @@ class SessionRunner:
                 summary: dict[str, Any] | None = None
                 if self.engine is not None and sequence is None:
                     plan_steps = [step.id for step in self.state.plan.steps]
-                    skipped = set(self.engine.skipped_step_ids)
+                    skipped_steps = set(self.engine.skipped_step_ids)
                     summary = {
                         "experiment_id": self.state.plan.experiment_id,
                         "total_steps": len(plan_steps),
                         "completed_steps": [s for s in plan_steps if s in completed_steps],
                         "out_of_order_steps": [s for s in plan_steps if s in late_steps],
-                        "skipped_steps": [s for s in plan_steps if s in skipped],
+                        "skipped_steps": [s for s in plan_steps if s in skipped_steps],
                         "missed_steps": [
-                            s for s in plan_steps if s not in completed_steps and s not in skipped
+                            s
+                            for s in plan_steps
+                            if s not in completed_steps and s not in skipped_steps
                         ],
                         "source_finished": not self.stop_event.is_set() and not was_error,
                     }
-                self.state.status.update(running=False, message=message, summary=summary)
+                self.state.status.update(
+                    running=False,
+                    message=message,
+                    summary=summary,
+                    timings_ms=self.timer.snapshot(),
+                    falling_behind=False,
+                )
             if self.state.get_runner() is self:
                 self.state.set_runner(None)
 
@@ -952,6 +1233,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except (ValueError, ValidationError) as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
+    def do_DELETE(self) -> None:
+        parsed = urllib.parse.urlparse(self.path)
+        parts = parsed.path.strip("/").split("/")
+        if len(parts) != 5 or parts[:2] != ["api", "activities"] or parts[3] != "annotations":
+            self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+            return
+        try:
+            activity_id = self._activity_id(f"/api/activities/{parts[2]}")
+            annotation_id = self._record_id(urllib.parse.unquote(parts[4]))
+            delete_annotation(self.server.registry, activity_id, annotation_id)
+        except FileNotFoundError as exc:
+            self._send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+            return
+        except (ValueError, ValidationError) as exc:
+            self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._send_json({"ok": True, "id": annotation_id})
+
     def do_PUT(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path.count("/") != 4 or not parsed.path.endswith("/plan"):
@@ -1282,6 +1581,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             device=self.server.device,
             filter_default_classes=False,
             use_media_time=True,
+            realtime=True,
+            upload=True,
         )
         self.server.state.set_runner(runner)
         runner.start()
@@ -1395,7 +1696,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         last_frame_id = -1
         try:
             while True:
-                frame, frame_id = self.server.state.frame_snapshot()
+                frame, frame_id = self.server.state.wait_for_frame(last_frame_id, timeout=1.0)
                 if frame is not None and frame_id != last_frame_id:
                     header = (
                         f"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {len(frame)}\r\n"
@@ -1404,7 +1705,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     self.wfile.write(header + frame + b"\r\n")
                     self.wfile.flush()
                     last_frame_id = frame_id
-                time.sleep(1 / 30)
         except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError):
             self.close_connection = True
 

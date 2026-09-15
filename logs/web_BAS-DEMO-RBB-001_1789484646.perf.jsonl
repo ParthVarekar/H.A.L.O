@@ -1,0 +1,5 @@
+{"wall_s": 5.03, "video_s": 5.04, "analysed": 126, "skipped": 0, "display_dropped": 0, "lag_s": 0.027, "timings_ms": {"decode": 0.37, "record": 1.5, "detect": 12.39, "engine": 0.03, "draw": 1.09, "encode": 1.08}}
+{"wall_s": 10.05, "video_s": 10.08, "analysed": 252, "skipped": 0, "display_dropped": 0, "lag_s": 0.017, "timings_ms": {"decode": 0.41, "record": 1.75, "detect": 13.89, "engine": 0.03, "draw": 1.15, "encode": 2.43}}
+{"wall_s": 15.06, "video_s": 15.08, "analysed": 377, "skipped": 0, "display_dropped": 0, "lag_s": 0.023, "timings_ms": {"decode": 0.51, "record": 1.55, "detect": 15.6, "engine": 0.04, "draw": 1.19, "encode": 2.36}}
+{"wall_s": 20.1, "video_s": 20.11, "analysed": 503, "skipped": 0, "display_dropped": 0, "lag_s": 0.028, "timings_ms": {"decode": 0.4, "record": 1.73, "detect": 14.6, "engine": 0.03, "draw": 1.11, "encode": 2.0}}
+{"wall_s": 25.13, "video_s": 25.15, "analysed": 629, "skipped": 0, "display_dropped": 0, "lag_s": 0.021, "timings_ms": {"decode": 0.36, "record": 1.47, "detect": 14.61, "engine": 0.03, "draw": 1.15, "encode": 1.97}}

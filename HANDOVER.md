@@ -4,7 +4,7 @@
 **Authoritative spec**: `docs/SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx` (in `C:\Users\Parth\Downloads`)
 **Mission**: SIH26174 — AI HAR for on-board BAS experiments (ISRO, Gaganyaan/BAS-01 2028).
 **Branch you'll be picked up from**: main.
-**Last verified state**: 115 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass, SIH PDF rendered and visually checked. The React Training Studio contains a separate MELFI activity with one uploaded take, an eight-step plan, and eight imported timeline records covering the full take; visual annotation has not started.
+**Last verified state (2026-09-15, see Section 18)**: 193 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass. The `cold_stowage_melfi` activity holds the real MELFI video, is boxed (775 boxes/55 frames), has a trained detector installed, and completes all 8 steps in order on the source video through the real dashboard. The section below (7) predates that work and is retained for historical/phase context only.
 
 ---
 
@@ -295,9 +295,9 @@ Schema-first activity/package contracts, registry plumbing, browser import, anno
 training/evaluation, and the manual release gate are implemented and covered in
 `docs/progress_log.md` Checkpoints 1–6. Package verification and approved activity selection are now
 also implemented. The next implementation is offline/replay hardening and generic package evidence
-adapters. The red/blue tracker remains a regression adapter only. `object_state` must be implemented
-before activities depending on it can be approved. 3D HMR, Jetson, and the learned temporal head
-remain parked.
+adapters. The red/blue tracker remains a regression adapter only. `object_state` (and the
+`inside_of` containment rule) is now implemented — see Section 18 — and used by the MELFI plan.
+3D HMR, Jetson, and the learned temporal head remain parked.
 
 The user-provided activity package has since been recreated through Training Studio and staged for
 annotation. Its procedure and eight-row timeline are saved, the take is uploaded, the dataset is
@@ -389,3 +389,68 @@ gate must pass with independent recording-session splits before a baseline can b
 For a complete dated continuation brief, read `CLAUDE_CODE_HANDOVER.md`. It consolidates the
 repository state, exact MELFI and Concrete Hardening inventories, command surface, architecture,
 risks, parked work, and the required progress-log format.
+
+## 18. Current state — 2026-09-15 (supersedes Sections 15-17 for MELFI)
+
+Sections 15-17 above describe the MELFI activity as it stood before 2026-09-13; that take was the
+wrong video (Life Sciences Glovebox footage, not MELFI) and has been moved intact to its own
+activity, `studying_cells_lsg`, as a reference. `cold_stowage_melfi` now holds the real MELFI
+video and is boxed, trained, and verified. Full detail is in `docs/progress_log.md` Checkpoints
+27-32; the summary:
+
+- **New MELFI video and plan.** `activities/cold_stowage_melfi/takes/slawosz_using_melfi-8821822197.mp4`
+  (67.16 s, 25 fps, 768x432): ESA astronaut Slawosz stores a sample in MELFI during the Ignis
+  mission. Plan v1.1.0 has 20 objects (including four numbered dewars, four numbered trays, a
+  latch, a hatch, two compartments) and 8 steps, each one observable state change.
+- **Object states and containment are now schema features**, added at the owner's request:
+  `ObjectSpec.states` (e.g. `open`/`closed`, `in`/`out`, `left`/`right`) expand into per-state
+  detector classes (`ClassName__state`), and `EvidenceRule.inside_of` mirrors the existing
+  `outside_of` so a step can require one box mostly inside another (e.g. "sample inside the open
+  compartment"). See `bas_har/schema/plan_schema.py` (`state_class`, `base_class`,
+  `ObjectSpec.detector_classes`, `ExperimentPlan.detector_classes/class_states`) and
+  `bas_har/procedure/evidence.py`.
+- **Owner boxed 775 boxes on 55 frames themselves** through the Studio (Claude Code does not box
+  MELFI — that was an explicit instruction). The Studio gained a state picker, a per-frame box
+  list (redraw/delete/change state), per-class colours, a show/hide-labels toggle, and "copy boxes
+  from previous frame"; `DELETE /api/activities/<id>/annotations/<annotation_id>` was added.
+- **Checker fixes found by testing on the real video**: overlapping same-object boxes in different
+  states now keep only the higher-confidence state (`resolve_state_conflicts`); step completion
+  and skip/late-completion confirmation both need the evidence in >=80% of a short sliding window
+  of frames rather than every frame in a row, so brief detector flicker or a single false positive
+  no longer flips a result; a later step is confirmed only once it has persisted, and a step
+  already satisfied at the very start (e.g. a closed hatch) is never mistaken for a completed step.
+- **A detector was trained** (yolo11n, image size 768, **no horizontal flip** — flipping would
+  swap dewar/tray quadrant numbers and left/right latch state) and installed at
+  `activities/cold_stowage_melfi/models/detector.pt`. Held-out mAP50 0.79 on 11 frames the model
+  never trained on; the installed model is trained on all 55 boxed frames, so its own numbers are
+  not a fair held-out score — only the step-by-step behavior on the full video is evidence of
+  real behavior.
+- **Verified result**: running the full video through the real `ProcedureEngine` (via the
+  dashboard, both by picking the activity manually and via automatic scene recognition) completes
+  all 8 steps in order with zero alerts, each within about a second of the state-change time
+  visible in the owner's own boxes.
+- **Dashboard playback was slow (about 0.2x real time) and has been fixed.** `SessionRunner` is
+  now three threads (analysis / presenter / recorder) so browser or disk work can never slow
+  detection; uploaded video is paced to its own frame rate (`PlaybackClock`); the MJPEG stream is
+  push-based (`WebState.wait_for_frame`) instead of polling; JPEG encoding uses nvjpeg on the GPU
+  with an OpenCV fallback (`bas_har/web/frame_encoder.py`); the detector warms up before playback.
+  Verified: 1.00x real-time factor, 25 fps delivered smoothly to a real browser client, unchanged
+  step results. The dashboard shows a live speed readout and a red banner if it ever falls back to
+  CPU with an NVIDIA GPU present.
+- **Voice alerts were re-tuned twice** after the owner reported them lagging, then found silent
+  (a leftover test mock had replaced the browser's speech engine — since removed), then asked for
+  faster: step completions now use short merge-if-crowded phrases at 1.5x speed, alerts interrupt
+  routine speech, and the dashboard also plays its own tones (a beep per step, a double tone for
+  alerts) so audio doesn't depend on the server's own `winsound` beep being audible.
+- **A manual "Experiment" picker** was added to the Operations dashboard: choosing an activity
+  skips scene recognition and monitors it directly (`X-Activity-Id` header, `GET
+  /api/analyze/activities`).
+- **`close_startup.bat` and `close_training_studio.bat`** were added to stop exactly what each
+  launcher started, without touching unrelated processes; each supports `--list` to preview.
+- **Not yet done**: a second independent MELFI recording session (needed before any
+  generalisation claim); the ice-vapour and fabric issue alerts (the owner said to build these
+  after training, and will say when); wiring `fliplr=0` into the Studio's own training button for
+  orientation-sensitive plans.
+
+The test suite is at 193 passing (`pytest -q`), Ruff and formatting clean, React build clean, as
+of this section.

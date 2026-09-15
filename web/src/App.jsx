@@ -42,6 +42,48 @@ function formatEventTime(event) {
   return typeof videoTime === "number" ? `${videoTime.toFixed(1)}s` : formatTime(event.ts_utc);
 }
 
+const SPEECH_RATE = 1.5;
+const SPEECH_LABEL_WORDS = 8;
+const SPEECH_CLAUSE_BREAK = /\s+(?:and|with|inside|into|in front|of)\s+/i;
+const SPEECH_MAX_PENDING = 2;
+
+let audioContext = null;
+
+function unlockAudio() {
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtor) return null;
+  if (!audioContext) audioContext = new AudioCtor();
+  if (audioContext.state === "suspended") audioContext.resume().catch(() => undefined);
+  return audioContext;
+}
+
+function playTone(frequency, durationMs, repeats = 1) {
+  const context = unlockAudio();
+  if (!context) return;
+  for (let index = 0; index < repeats; index += 1) {
+    const start = context.currentTime + index * (durationMs / 1000 + 0.08);
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.25, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + durationMs / 1000);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(start);
+    oscillator.stop(start + durationMs / 1000 + 0.02);
+  }
+}
+
+function describeCompletions(steps) {
+  if (steps.length === 1) return `Step ${steps[0].number} done, ${steps[0].label}.`;
+  const numbers = steps.map((step) => step.number);
+  const consecutive = numbers.every((number, index) => index === 0 || number === numbers[index - 1] + 1);
+  if (steps.length === 2) return `Steps ${numbers[0]} and ${numbers[1]} done.`;
+  if (consecutive) return `Steps ${numbers[0]} to ${numbers[numbers.length - 1]} done.`;
+  return `Steps ${numbers.slice(0, -1).join(", ")} and ${numbers[numbers.length - 1]} done.`;
+}
+
 function eventKey(event) {
   return `${event.ts_utc}|${event.step_id}|${event.step_status}|${event.alert_code || ""}`;
 }
@@ -131,19 +173,26 @@ function App() {
   const spokenEvents = useRef(null);
   const spokenSummary = useRef(undefined);
 
+  const planRevision = useRef(null);
+
   const refresh = useCallback(async () => {
     try {
-      const [nextPlan, nextStatus, nextEvents, nextActivities] = await Promise.all([
-        readJson("/api/plan"),
+      const [nextStatus, nextEvents] = await Promise.all([
         readJson("/api/status"),
         readJson("/api/events"),
-        readJson("/api/operations/activities"),
       ]);
-      setPlan(nextPlan);
+      if (planRevision.current !== nextStatus.plan_revision) {
+        const [nextPlan, nextActivities] = await Promise.all([
+          readJson("/api/plan"),
+          readJson("/api/operations/activities"),
+        ]);
+        planRevision.current = nextStatus.plan_revision;
+        setPlan(nextPlan);
+        setOperationActivities(nextActivities);
+      }
       setStatus(nextStatus);
       setEvents(nextEvents);
       setSource((current) => current || nextStatus.source || "");
-      setOperationActivities(nextActivities);
       setError(nextStatus.error || "");
       setLoaded(true);
     } catch (requestError) {
@@ -174,13 +223,103 @@ function App() {
     [plan.steps],
   );
 
-  const speak = useCallback(
-    (text) => {
-      if (!voiceOn || !("speechSynthesis" in window)) return;
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  const stepNumber = useCallback(
+    (stepId) => {
+      const index = plan.steps.findIndex((step) => step.id === stepId);
+      return index >= 0 ? index + 1 : null;
     },
-    [voiceOn],
+    [plan.steps],
   );
+
+  const shortStep = useCallback(
+    (stepId) =>
+      describeStep(stepId)
+        .replace(/\s*\([^)]*\)/g, "")
+        .replace(/^slawosz\s+/i, "")
+        .split(SPEECH_CLAUSE_BREAK)[0]
+        .split(/\s+/)
+        .slice(0, SPEECH_LABEL_WORDS)
+        .join(" "),
+    [describeStep],
+  );
+
+  const speechQueue = useRef({ messages: [], steps: [], current: null });
+
+  const flushSpeech = useCallback(() => {
+    if (!("speechSynthesis" in window)) return;
+    const queue = speechQueue.current;
+    if (queue.current) return;
+    let text = null;
+    let kind = null;
+    if (queue.messages.length) {
+      const next = queue.messages.shift();
+      text = next.text;
+      kind = next.kind;
+    } else if (queue.steps.length) {
+      const steps = queue.steps.splice(0).sort((a, b) => a.number - b.number);
+      text = describeCompletions(steps);
+      kind = "steps";
+    }
+    if (!text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = SPEECH_RATE;
+    const token = { kind, utterance };
+    const finish = () => {
+      if (queue.current === token) {
+        queue.current = null;
+        flushSpeech();
+      }
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    queue.current = token;
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const say = useCallback(
+    (text, kind = "info") => {
+      if (!voiceOn || !("speechSynthesis" in window)) return;
+      const queue = speechQueue.current;
+      if (kind === "alert") {
+        queue.messages = [{ text, kind }, ...queue.messages.filter((item) => item.kind === "alert")];
+        if (queue.current && queue.current.kind !== "alert") {
+          queue.current = null;
+          window.speechSynthesis.cancel();
+        }
+      } else if (kind === "summary") {
+        queue.messages = [{ text, kind }];
+        queue.steps = [];
+        if (queue.current) {
+          queue.current = null;
+          window.speechSynthesis.cancel();
+        }
+      } else {
+        queue.messages = [...queue.messages.slice(-(SPEECH_MAX_PENDING - 1)), { text, kind }];
+      }
+      flushSpeech();
+    },
+    [voiceOn, flushSpeech],
+  );
+
+  const announceStep = useCallback(
+    (stepId) => {
+      if (!voiceOn || !("speechSynthesis" in window)) return;
+      const number = stepNumber(stepId);
+      if (number === null) return;
+      const queue = speechQueue.current;
+      if (!queue.steps.some((item) => item.number === number)) {
+        queue.steps.push({ number, label: shortStep(stepId) });
+      }
+      flushSpeech();
+    },
+    [voiceOn, stepNumber, shortStep, flushSpeech],
+  );
+
+  useEffect(() => {
+    if (voiceOn || !("speechSynthesis" in window)) return;
+    speechQueue.current = { messages: [], steps: [], current: null };
+    window.speechSynthesis.cancel();
+  }, [voiceOn]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -192,17 +331,36 @@ function App() {
       const key = eventKey(event);
       if (spokenEvents.current.has(key)) continue;
       spokenEvents.current.add(key);
+      const number = stepNumber(event.step_id);
+      const name = number ? `step ${number}` : describeStep(event.step_id);
+      const alerting = event.step_status === "skipped" || Boolean(event.alert_code);
+      if (voiceOn && (alerting || event.step_status === "completed")) {
+        if (alerting) playTone(440, 160, 2);
+        else playTone(880, 90);
+      }
       if (event.step_status === "skipped") {
-        speak(`Alert. Step skipped: ${describeStep(event.step_id)}.`);
+        say(`Alert: ${name} skipped.`, "alert");
       } else if (event.alert_code === "OUT_OF_ORDER") {
-        speak(`Alert. Done out of order: ${describeStep(event.step_id)}.`);
+        say(`Alert: ${name} done out of order.`, "alert");
       } else if (event.alert_code === "PAUSE_EXCEEDED") {
-        speak(`Alert. No progress on: ${describeStep(event.step_id)}.`);
+        say(`Alert: no progress on ${name}.`, "alert");
       } else if (event.step_status === "completed") {
-        speak(`Step completed. ${describeStep(event.step_id)}.`);
+        announceStep(event.step_id);
       }
     }
-  }, [loaded, events, speak, describeStep]);
+  }, [loaded, events, voiceOn, say, announceStep, stepNumber, describeStep]);
+
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    window.addEventListener("drop", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("drop", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (!loaded) return;
@@ -214,17 +372,19 @@ function App() {
     }
     if (!key || key === spokenSummary.current) return;
     spokenSummary.current = key;
-    const skipped = (summary.skipped_steps || []).map(describeStep);
-    const missed = summary.missed_steps.map(describeStep);
-    const late = (summary.out_of_order_steps || []).map(describeStep);
-    speak(
-      `Analysis finished. ${summary.completed_steps.length} of ${summary.total_steps} steps completed.` +
-        (skipped.length ? ` Skipped: ${skipped.join(", ")}.` : "") +
-        (late.length ? ` Out of order: ${late.join(", ")}.` : "") +
-        (missed.length ? ` Not reached: ${missed.join(", ")}.` : "") +
-        (!skipped.length && !missed.length && !late.length ? " All steps completed in order." : ""),
+    const numbers = (ids) => ids.map((id) => stepNumber(id) ?? describeStep(id)).join(", ");
+    const skipped = summary.skipped_steps || [];
+    const missed = summary.missed_steps || [];
+    const late = summary.out_of_order_steps || [];
+    say(
+      `Analysis finished. ${summary.completed_steps.length} of ${summary.total_steps} steps done.` +
+        (skipped.length ? ` Skipped: step ${numbers(skipped)}.` : "") +
+        (late.length ? ` Out of order: step ${numbers(late)}.` : "") +
+        (missed.length ? ` Not reached: step ${numbers(missed)}.` : "") +
+        (!skipped.length && !missed.length && !late.length ? " All in order." : ""),
+      "summary",
     );
-  }, [loaded, status.summary, status.running, status.started_at, speak, describeStep]);
+  }, [loaded, status.summary, status.running, status.started_at, say, stepNumber, describeStep]);
 
   const currentIndex = useMemo(
     () => plan.steps.findIndex((step) => step.id === status.current_step_id),
@@ -317,11 +477,11 @@ function App() {
       const match = data.scores.find((score) => score.activity_id === data.activity_id) || known;
       const verb = selectedExperiment ? "Selected" : "Recognised";
       if (!data.recognized) {
-        speak("Experiment not recognised.");
+        say("Experiment not recognised.");
       } else if (match && !match.has_detector) {
-        speak(`${verb} ${match.name}, but step monitoring is not available for it yet.`);
+        say(`${verb} ${match.name}, but step monitoring is not available for it yet.`);
       } else {
-        speak(`${verb} ${match?.name || data.activity_id}. Monitoring the procedure.`);
+        say(`${verb} ${match?.name || data.activity_id}. Monitoring.`);
       }
       await refresh();
     } catch (requestError) {
@@ -451,8 +611,27 @@ function App() {
               </div>
             )}
             <div className="video-overlay"><span className="rec-dot" /> {status.running ? "LIVE" : "STANDBY"}</div>
-            <div className="video-stats">{status.fps.toFixed(1)} FPS <span>·</span> frame {Math.max(0, status.frame_id)}</div>
+            <div className="video-stats">
+              {status.fps.toFixed(1)} FPS <span>·</span> frame {Math.max(0, status.frame_id)}
+              {status.realtime_factor != null && <><span>·</span> {status.realtime_factor.toFixed(2)}x speed</>}
+            </div>
           </div>
+          {status.cpu_fallback && (
+            <div className="error-banner">Running on the CPU although an NVIDIA GPU is present. Start the dashboard with .venv\Scripts\python.exe (startup.bat does this) so detection uses the GPU.</div>
+          )}
+          {status.running && status.falling_behind && (
+            <div className="notice-banner">Analysis is falling behind the video; some frames are being skipped to keep real speed.</div>
+          )}
+          {Object.keys(status.timings_ms || {}).length > 0 && (
+            <div className="perf-readout">
+              <span>{status.device || "auto"}</span>
+              <span>{status.encoder || "--"} JPEG</span>
+              <span>display {Number(status.display_fps || 0).toFixed(1)} fps</span>
+              {Object.entries(status.timings_ms).map(([stage, value]) => (
+                <span key={stage}>{stage} {Number(value).toFixed(1)} ms</span>
+              ))}
+            </div>
+          )}
           <div className="source-row">
             <label htmlFor="source">Capture source</label>
             <input

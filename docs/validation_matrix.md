@@ -75,7 +75,7 @@ If their description matches in order, Phase 0 is done.
 | Plan-driven color sequence tracker | red/blue pick-return-close state transitions | `tests/test_sequence.py` | pass |
 | Supplied MP4 acceptance | six ordered events and complete state | `scripts/analyze_sequence.py` | pass |
 
-## Current Training Studio intake checks
+## Historical Training Studio intake checks (superseded — see below)
 
 | Check | Target | Evidence | Status |
 |---|---|---|---|
@@ -87,6 +87,27 @@ If their description matches in order, Phase 0 is done.
 | MELFI visual annotations | human boxes exist for every intended detector class | STEP 05 annotation count is 0 | pending |
 | MELFI dataset preparation | labels and session-level splits are ready | no dataset prepared yet | pending |
 | MELFI training/evaluation | CUDA training and held-out evaluation produce reports | no training job or evaluation report yet | pending |
+
+The rows above describe the wrong video (Life Sciences Glovebox footage, since moved to activity
+`studying_cells_lsg`). The current MELFI activity is checked below.
+
+## Current MELFI intake checks (2026-09-15)
+
+| Check | Target | Evidence | Status |
+|---|---|---|---|
+| Real MELFI video ingestion | uploaded take is readable and metadata is probed by the Studio | take `slawosz_using_melfi-8821822197`, 67.16s, ~25.01 FPS, 768x432 | pass |
+| MELFI procedure validation | eight single-action, reachable steps with valid object/state references | `activities/cold_stowage_melfi/plan.yaml` v1.1.0 | pass |
+| Object states and `inside_of` schema | states expand to per-state detector classes; `inside_of` validated like `outside_of` | `tests/test_state_checker.py`, `tests/test_plan_schema.py` | pass |
+| MELFI visual annotations | human boxes drawn by the owner, including nested boxes and states | 775 boxes across 55 frames | pass |
+| MELFI dataset preparation | boxed-frame-only dataset with a held-out split | `build_melfi_dataset.py` (scratchpad), 44 train / 11 held-out frames | pass |
+| MELFI detector training | CUDA training without horizontal flip (orientation-sensitive classes) | yolo11n, imgsz 768, `fliplr=0`; held-out mAP50 0.79 | pass |
+| Checker state-conflict resolution | overlapping same-object states keep only the higher-confidence one | `tests/test_state_checker.py::test_overlapping_state_boxes_keep_only_the_more_confident_state` | pass |
+| Checker flicker tolerance | completion/skip confirmation survive a dropped frame or a brief false positive | `tests/test_state_checker.py`, `tests/test_procedure_engine.py::test_flickering_later_step_still_skips_ahead` | pass |
+| Full-video step sequence | all 8 steps complete in order with zero alerts | cached-perception replay and live dashboard run on the source video | pass |
+| Real-time dashboard playback | uploaded video plays at its own frame rate, GPU-accelerated | `tests/test_web_streaming.py`, live run: 1.00x factor, 25.0 fps delivered | pass |
+| GPU-accelerated JPEG encoding with fallback | nvjpeg used when available, OpenCV otherwise | `tests/test_frame_encoder.py` | pass |
+| Second independent MELFI session | needed before any generalisation claim | not yet recorded | pending |
+| Issue alerts (ice vapour, fabric) | deferred at the owner's request | classes boxed, alert logic not built | pending |
 
 ## Phase 2 (procedure engine) acceptance
 

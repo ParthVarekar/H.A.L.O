@@ -1,0 +1,32 @@
+path: C:/Users/Parth/Desktop/HAR_for_BAS/activities/cold_stowage_melfi/datasets/dataset_v1
+names:
+  0: sample
+  1: melfi_freezer
+  2: dewar_1
+  3: dewar_2
+  4: dewar_3
+  5: dewar_4
+  6: dewar_latch__left
+  7: dewar_latch__right
+  8: dewar_hatch__open
+  9: dewar_hatch__closed
+  10: tray_1__in
+  11: tray_1__out
+  12: tray_2__in
+  13: tray_2__out
+  14: tray_3__in
+  15: tray_3__out
+  16: tray_4__in
+  17: tray_4__out
+  18: compartment_1__open
+  19: compartment_1__closed
+  20: compartment_2__open
+  21: compartment_2__closed
+  22: compartment_knob
+  23: astronaut_slawosz
+  24: astronaut_other
+  25: ice_vapor
+  26: fabric
+  27: logo
+train: C:/Users/Parth/Desktop/HAR_for_BAS/activities/cold_stowage_melfi/datasets/dataset_v1/all_images.txt
+val: images/val

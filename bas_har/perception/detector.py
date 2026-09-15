@@ -34,6 +34,14 @@ class ObjectDetector:
         self._iou = iou_threshold
         self._target = set(c.lower() for c in target_classes) if target_classes else None
         self._class_names: dict[int, str] = self._model.names
+        self._imgsz = self._trained_imgsz(self._model)
+
+    @staticmethod
+    def _trained_imgsz(model: object) -> int | None:
+        ckpt = getattr(model, "ckpt", None)
+        train_args = ckpt.get("train_args") if isinstance(ckpt, dict) else None
+        imgsz = train_args.get("imgsz") if isinstance(train_args, dict) else None
+        return imgsz if isinstance(imgsz, int) and imgsz > 0 else None
 
     @property
     def class_names(self) -> dict[int, str]:
@@ -53,14 +61,14 @@ class ObjectDetector:
             return "cpu"
         return "cuda:0" if torch.cuda.is_available() else "cpu"
 
+    def warmup(self, width: int, height: int) -> None:
+        self.detect(np.zeros((height, width, 3), dtype=np.uint8))
+
     def detect(self, frame_bgr: np.ndarray) -> list[Detection]:
-        results = self._model.predict(
-            frame_bgr,
-            device=self._device,
-            conf=self._conf,
-            iou=self._iou,
-            verbose=False,
-        )
+        options = {"device": self._device, "conf": self._conf, "iou": self._iou, "verbose": False}
+        if self._imgsz is not None:
+            options["imgsz"] = self._imgsz
+        results = self._model.predict(frame_bgr, **options)
         detections: list[Detection] = []
         if not results:
             return detections

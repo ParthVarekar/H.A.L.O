@@ -136,6 +136,40 @@ plan, so they must be labelled consistently or removed from the detector plan be
 gate.
 
 The collaborator-facing operating instructions are in `training_guide.md`, and the dataset
-inventory and remaining work are in `dataset_progress.md`. The current MELFI activity is staged
-for manual annotation; no MELFI detector has been trained or evaluated yet. The next milestone is
-a passed session-level quality gate followed by a CUDA baseline and held-out evaluation.
+inventory and remaining work are in `dataset_progress.md`. The above describes the activity
+intake before 2026-09-14; see the current-state section below for what superseded it.
+
+## Current activity intake (2026-09-15)
+
+The activity described above was the wrong video — Life Sciences Glovebox footage, not MELFI —
+and has been moved intact to a new activity, `studying_cells_lsg`, kept as an archived reference.
+`activities/cold_stowage_melfi/` now holds the real MELFI video the owner supplied
+(`slawosz_using_melfi-8821822197`, 67.16 s, 25 fps, 768x432): an ESA astronaut stores a sample
+pouch in MELFI during the Ignis mission. The owner boxed 775 boxes across 55 frames themselves,
+and a detector (yolo11n, no horizontal flip) is trained and installed.
+
+Two schema additions came from this work, both explicitly approved by the owner:
+
+- **Per-object states** (`ObjectSpec.states`) expand a class into per-state detector classes
+  (`state_class`/`base_class` in `bas_har/schema/plan_schema.py`), so a hatch, tray, or latch can
+  be boxed and checked as open/closed, in/out, or left/right without inventing a parallel schema.
+- **`inside_of`** on `EvidenceRule` mirrors the existing `outside_of`, so a step can require one
+  detection mostly inside another (`INSIDE_MIN_FRACTION = 0.8` in `bas_har/procedure/evidence.py`),
+  used for "the sample is inside the open compartment".
+
+Testing the checker against the real video (not just unit tests) surfaced two engine bugs that are
+now fixed: overlapping same-object detections in different states could let the wrong state win
+(`resolve_state_conflicts`), and both step completion and skip/late-completion confirmation used
+to require the evidence in every consecutive frame, so one dropped frame or false detection could
+flip a result — both now use an 80%-of-a-short-window rule instead.
+
+The dashboard's live-capture path was also found to run uploaded video at about 0.2x real time
+under a real browser. `SessionRunner` is now three threads (analysis / presenter / recorder) so no
+viewer or disk work can slow detection, file sources are paced to their own frame rate, the MJPEG
+stream is push-based instead of polled, and JPEG encoding uses the GPU (nvjpeg) with a CPU
+fallback. Verified at 1.00x real-time factor with 25 fps delivered smoothly to a real browser
+client and unchanged step results.
+
+Full detail is `docs/progress_log.md` Checkpoints 27-32. The next milestone is a second
+independent MELFI recording session before any generalisation claim, and the deferred
+ice-vapour/fabric issue alerts.

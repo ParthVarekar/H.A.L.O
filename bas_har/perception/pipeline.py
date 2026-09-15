@@ -24,10 +24,12 @@ class PerceptionPipeline:
         run_hands: bool = True,
         device: str = "auto",
         color_names: Iterable[str] | None = None,
+        conf_threshold: float = 0.25,
     ) -> None:
         self.detector = ObjectDetector(
             model_path=yolo_model,
             device=device,
+            conf_threshold=conf_threshold,
             target_classes=target_classes,
         )
         self.run_pose = run_pose
@@ -40,6 +42,9 @@ class PerceptionPipeline:
     @property
     def device(self) -> str:
         return self.detector.device
+
+    def warmup(self, width: int, height: int) -> None:
+        self.detector.warmup(width, height)
 
     def process(self, frame_bgr: np.ndarray, frame_id: int, ts_ms: int) -> PerceptionResult:
         h, w = frame_bgr.shape[:2]
