@@ -54,6 +54,17 @@ const SESSION_LOG_LIMIT = 500;
 const LOG_DISPLAY_LIMIT = 200;
 const UPLOAD_PATH = /[\\/]logs[\\/]uploads[\\/]/;
 const BOXES_PREFERENCE_KEY = "bas-har-show-boxes";
+const THEME_KEY = "bas-har-theme";
+
+function readTheme() {
+  const requested = new URLSearchParams(window.location.search).get("theme");
+  if (requested === "light" || requested === "dark") return requested;
+  try {
+    return window.localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
 
 const SPEECH_RATE = 1.5;
 const SPEECH_LABEL_WORDS = 8;
@@ -167,6 +178,17 @@ function App() {
   const [dismissedAlert, setDismissedAlert] = useState(null);
   const [showBoxes, setShowBoxes] = useState(() => readBoxesPreference() ?? true);
   const [stillVersion, setStillVersion] = useState(0);
+  const [theme, setTheme] = useState(readTheme);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    try {
+      window.localStorage.setItem(THEME_KEY, next);
+    } catch {
+      return;
+    }
+  }
 
   const spokenEvents = useRef(null);
   const spokenSummary = useRef(undefined);
@@ -744,11 +766,19 @@ function App() {
   return (
     <div
       className={`ops ${workspace === "studio" ? "is-studio" : ""}`}
+      data-theme={theme}
       onDragOver={workspace === "operations" ? handleDragOver : undefined}
       onDragLeave={workspace === "operations" ? handleDragLeave : undefined}
       onDrop={workspace === "operations" ? handleDrop : undefined}
     >
-      <AppBar workspace={workspace} onWorkspace={setWorkspace} connected={connected} gpuName={shortGpuName(hardware)} />
+      <AppBar
+        workspace={workspace}
+        onWorkspace={setWorkspace}
+        connected={connected}
+        gpuName={shortGpuName(hardware)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
       {workspace === "studio" ? (
         <main className="app-shell">
           <TrainingStudio />

@@ -896,3 +896,72 @@ html {
   .ops-callout { flex-wrap: wrap; }
   .ops-callout-actions { margin-left: 38px; }
 }
+
+/* Light theme */
+
+html:has(.ops[data-theme="light"]) {
+  color-scheme: light;
+  scrollbar-color: #c7cdd6 #f6f7f9;
+}
+
+.ops[data-theme="light"] {
+  --o-bg: #f6f7f9;
+  --o-surface: #ffffff;
+  --o-surface-2: #f3f5f8;
+  --o-surface-3: #e8ecf1;
+  --o-hairline: rgba(15, 23, 42, 0.08);
+  --o-hairline-strong: rgba(15, 23, 42, 0.14);
+  --o-text: #0e1116;
+  --o-text-2: #4b5563;
+  --o-text-3: #7b8491;
+  --o-text-4: #a9b0ba;
+  --o-accent: #2f7bff;
+  --o-accent-strong: #2f7bff;
+  --o-accent-soft: rgba(47, 123, 255, 0.09);
+  --o-accent-line: rgba(47, 123, 255, 0.4);
+  --o-ok: #12a26a;
+  --o-ok-soft: rgba(18, 162, 106, 0.1);
+  --o-warn: #c48609;
+  --o-warn-soft: rgba(196, 134, 9, 0.12);
+  --o-danger: #d9413f;
+  --o-danger-soft: rgba(217, 65, 63, 0.09);
+  --o-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 28px -14px rgba(15, 23, 42, 0.14);
+  background:
+    radial-gradient(900px 420px at 50% -180px, rgba(47, 123, 255, 0.08), transparent 70%),
+    var(--o-bg);
+  background-repeat: no-repeat;
+  color-scheme: light;
+}
+
+.ops[data-theme="light"] .ops-main,
+.ops[data-theme="light"] .ops-main * { scrollbar-color: #c7cdd6 transparent; }
+.ops[data-theme="light"] .ops-appbar { background: rgba(246, 247, 249, 0.86); }
+.ops[data-theme="light"] .ops-segmented { background: var(--o-surface-2); }
+.ops[data-theme="light"] .ops-segmented button[aria-current="page"] { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.06); }
+.ops[data-theme="light"] .ops-select:hover:not(:disabled),
+.ops[data-theme="light"] .ops-input:hover { border-color: rgba(15, 23, 42, 0.26); }
+.ops[data-theme="light"] .ops-btn { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+.ops[data-theme="light"] .ops-btn:hover:not(:disabled):not(.is-disabled) { background: var(--o-surface-2); border-color: rgba(15, 23, 42, 0.22); }
+.ops[data-theme="light"] .ops-btn--primary { color: #fff; background: linear-gradient(180deg, #4a8dff, #2f7bff); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 16px -8px rgba(47, 123, 255, 0.6); }
+.ops[data-theme="light"] .ops-btn--primary:hover:not(:disabled):not(.is-disabled) { background: linear-gradient(180deg, #5b98ff, #3a82ff); }
+.ops[data-theme="light"] .ops-btn--danger { color: var(--o-danger); background: var(--o-danger-soft); }
+.ops[data-theme="light"] .ops-btn--ghost { background: transparent; box-shadow: none; }
+.ops[data-theme="light"] .ops-stage { background: #0e1116; }
+.ops[data-theme="light"] .ops-stage-empty { background: radial-gradient(420px 220px at 50% 45%, rgba(47, 123, 255, 0.07), transparent 70%), #f3f5f8; }
+.ops[data-theme="light"] .ops-stage-empty::before { background-image: radial-gradient(rgba(15, 23, 42, 0.1) 1px, transparent 1.2px); }
+.ops[data-theme="light"] .ops-dropzone { border-color: rgba(15, 23, 42, 0.16); background: rgba(255, 255, 255, 0.85); }
+.ops[data-theme="light"] .ops-step-title { color: #6b7380; }
+.ops[data-theme="light"] .ops-step.is-done .ops-step-marker,
+.ops[data-theme="light"] .ops-step.is-late .ops-step-marker,
+.ops[data-theme="light"] .ops-step.is-skipped .ops-step-marker { color: #fff; }
+.ops[data-theme="light"] .ops-step.is-current { background: linear-gradient(90deg, rgba(47, 123, 255, 0.08), rgba(47, 123, 255, 0.01) 70%, transparent); }
+.ops[data-theme="light"] .ops-meter { background: rgba(15, 23, 42, 0.08); }
+.ops[data-theme="light"] .ops-filter { background: var(--o-surface-2); }
+.ops[data-theme="light"] .ops-filter button[aria-selected="true"] { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1); }
+.ops[data-theme="light"] .ops-log-row:hover { background: rgba(15, 23, 42, 0.025); }
+.ops[data-theme="light"] .ops-answer-track::before { background: rgba(15, 23, 42, 0.07); }
+.ops[data-theme="light"] .ops-drop-overlay { background: rgba(246, 247, 249, 0.9); }
+.ops[data-theme="light"] .ops-metric-bar div { background: linear-gradient(90deg, #12a26a, #34d399); }
+
+.ops-theme-toggle { width: 28px; justify-content: center; padding: 0; cursor: pointer; font: inherit; }
+.ops-theme-toggle:hover { color: var(--o-text); border-color: var(--o-hairline-strong); }

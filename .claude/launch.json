@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "C:/Users/Parth/Desktop/HAR_for_BAS/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "bas_har.web.server",
+        "--plan",
+        "C:/Users/Parth/Desktop/HAR_for_BAS/activities/cold_stowage_melfi/plan.yaml",
+        "--yolo-model",
+        "C:/Users/Parth/Desktop/HAR_for_BAS/activities/cold_stowage_melfi/models/detector.pt",
+        "--device",
+        "auto",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5767",
+        "--no-start"
+      ],
+      "port": 5767
+    }
+  ]
+}
