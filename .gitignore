@@ -77,3 +77,7 @@ web/node_modules/
 .DS_Store
 Thumbs.db
 desktop.ini
+models/*.ts
+
+# --- Runtime output (session logs, uploaded videos, recordings) ---
+logs/

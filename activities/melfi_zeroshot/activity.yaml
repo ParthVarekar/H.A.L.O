@@ -1,0 +1,11 @@
+id: melfi_zeroshot
+name: MELFI Sample Stowage (described, not trained)
+kind: experiment
+version: 0.1.0
+author: local
+description: The same MELFI stowage procedure as cold_stowage_melfi, but every object is described
+  in plain text and every step is checked by asking a vision-language model a yes/no question. No
+  boxes, no training, so it can be pointed at any MELFI video.
+plan_path: plan.yaml
+camera_profile: default
+lifecycle: imported

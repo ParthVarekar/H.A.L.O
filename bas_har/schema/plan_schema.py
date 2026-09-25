@@ -96,6 +96,20 @@ class ObjectSpec(StrictModel):
     classes: list[str] = Field(min_length=1)
     colors_any: list[str] = Field(default_factory=list)
     states: list[HoiLabel] = Field(default_factory=list)
+    prompts: list[str] = Field(
+        default_factory=list,
+        description="Plain-text descriptions for an open-vocabulary detector, so the object can be found without training.",
+    )
+
+    @field_validator("prompts")
+    @classmethod
+    def check_prompts(cls, value: list[str]) -> list[str]:
+        cleaned = [prompt.strip().lower() for prompt in value]
+        if any(not prompt for prompt in cleaned):
+            raise ValueError("prompts must be non-empty strings")
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("prompts must be unique")
+        return cleaned
 
     @field_validator("classes")
     @classmethod
@@ -135,6 +149,7 @@ class EvidenceRule(StrictModel):
         "object_state",
         "object_location",
         "actor_visible",
+        "visual_question",
     ]
     object: ObjectId | None = None
     label: HoiLabel | None = None
@@ -142,6 +157,17 @@ class EvidenceRule(StrictModel):
     outside_of: ObjectId | None = None
     inside_of: ObjectId | None = None
     in_region: RegionId | None = None
+    question: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=300,
+        description="Yes/no question about the current frame, answered by a vision-language model.",
+    )
+    expect: Literal["yes", "no"] = Field(
+        default="yes",
+        description="Which answer satisfies the rule. Ask questions positively and use `no` for the "
+        "closed/removed/finished state; models answer absence questions poorly.",
+    )
     min_frames: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
@@ -151,6 +177,7 @@ class EvidenceRule(StrictModel):
             "object_visible": ("object",),
             "object_state": ("object", "state"),
             "object_location": ("object", "in_region"),
+            "visual_question": ("question",),
         }
         for field in required.get(self.kind, ()):
             if getattr(self, field) is None:
@@ -304,6 +331,27 @@ class ExperimentPlan(StrictModel):
                 if name not in names:
                     names.append(name)
         return names
+
+    def prompt_classes(self) -> dict[str, str]:
+        """Detector prompt -> class name, for running without a trained detector."""
+        mapping: dict[str, str] = {}
+        for obj in self.objects:
+            for name in obj.classes:
+                for prompt in obj.prompts or [name.replace("_", " ")]:
+                    mapping.setdefault(prompt, name)
+        return mapping
+
+    def visual_questions(self) -> list[str]:
+        questions: list[str] = []
+        for step in self.steps:
+            for rule in step.evidence:
+                if (
+                    rule.kind == "visual_question"
+                    and rule.question
+                    and rule.question not in questions
+                ):
+                    questions.append(rule.question)
+        return questions
 
     def class_states(self) -> dict[str, list[str]]:
         states: dict[str, list[str]] = {}

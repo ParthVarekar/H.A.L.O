@@ -282,8 +282,10 @@ The old PySide6 UI was removed. The compatibility names `run-gui`, `run-web`, an
 
 ## 14. Training Studio continuation plan
 
-The approved plan for the next major work is saved in `docs/training_studio_plan.md`. The
-cross-session implementation checkpoint and progress rules are saved in `docs/progress_log.md`.
+The cross-session implementation checkpoint and progress rules are saved in
+`docs/progress_log.md`. (The original planning document, `docs/training_studio_plan.md`, was
+retired on 2026-09-16 once every item in it had been implemented or superseded; its history is
+still visible in `docs/progress_log.md` and in git history.)
 
 The target is a local-first React Training Studio inside the existing port-5767 dashboard. It
 supports generic activity packages for experiments, maintenance, training, and exercise. Users
@@ -454,3 +456,73 @@ video and is boxed, trained, and verified. Full detail is in `docs/progress_log.
 
 The test suite is at 193 passing (`pytest -q`), Ruff and formatting clean, React build clean, as
 of this section.
+
+## 19. Described-not-trained recognition — 2026-09-22
+
+New capability, added on the owner's instruction to find a way around per-video training. It does
+not replace anything: an activity with a trained detector behaves exactly as before.
+
+- **How an activity enters zero-shot mode.** `_analyze_video` in `bas_har/web/server.py` checks
+  for `activities/<id>/models/detector.pt`. Missing, but the plan's objects have `prompts` ->
+  `SessionRunner(zero_shot=True)`. Missing and no prompts -> the old refusal message.
+- **Open-vocabulary detection** (`bas_har/perception/open_vocab.py`): YOLOE with the MobileCLIP
+  text encoder, given the plan's prompts via `ExperimentPlan.prompt_classes()`, which maps each
+  prompt back to a plan class so evidence rules are unchanged. Needs `models/yoloe-11s-seg.pt` and
+  `models/mobileclip_blt.ts` (the 600 MB encoder is gitignored; the loader chdirs to `models/` so
+  Ultralytics can find it by its bare filename).
+- **Frame questions** (`bas_har/perception/vlm.py`): `VisualQuestionAnswerer` wraps
+  Qwen3-VL-2B-Instruct (Apache-2.0) and answers every active question about one frame in a single
+  call. `AsyncVisualQuestioner` runs it on a background thread with a newest-frame slot and a
+  latest-answers dict, so the analysis thread never waits; answers arrive as
+  `PerceptionResult.questions` and persist until replaced. `_active_questions` narrows the list to
+  the current and next steps each frame.
+- **Schema**: `ObjectSpec.prompts`, evidence `kind: visual_question` with `question` and
+  `expect: yes|no`. `expect` is not decoration — the model answers "is it open?" well and "is it
+  closed?" close to randomly, so closing steps ask the same positive question and expect "no".
+- **Engine**: `_state_change_pending` now keys on `visual_question` + `expect` as well as
+  `object_state` (`_change_key`), otherwise a final step whose expected answer is already true at
+  t=0 makes the engine declare everything skipped in the first seconds.
+- **Two traps, both hit once and both in the risk register (26, 27)**: absence-phrased questions,
+  and closing steps being satisfied by footage that contains none of the equipment. The second one
+  produced a fake "8 of 8" before the equipment-visible guard was added.
+- **Where it stands honestly.** On an unseen MELFI video: 5 of 8 steps, at the right times, with
+  no false alerts and no spurious completions, at 1.0x real time on cuda:0 (detect 35.4 ms/frame,
+  36 answers over 153 s). The trained detector scores 0 on the same video. Fine states are the
+  weak part; steps 2 and 3 complete 0.12 s apart, which is not a real reading of two actions.
+- **Next things worth trying** (not done): vote-smoothing across consecutive answers; Qwen3-VL-4B;
+  restricting a zero-shot run to the video segment where the equipment is present; letting the
+  Studio generate a first draft of prompts and questions from a step description.
+
+Test suite 204 passing, Ruff and formatting clean, React build clean as of this section.
+
+## 20. Described mode, second pass — 2026-09-23 (corrects Section 19)
+
+Section 19 overstated two things: the new video (`studying cells in space.mp4`) holds **two** MELFI
+cycles, not one, and the "equipment visible" guard never worked. Full detail and numbers are in
+`docs/progress_log.md` Checkpoint 34.
+
+- **Answers are probabilities now.** `VisualQuestionAnswerer.ask` pre-fills the JSON answer ("yes"
+  in every slot, then "no" in every slot) and reads the yes-vs-no probability at each slot in one
+  forward pass: ~0.4 s for a plan's 3-5 questions instead of 3-4 s of text generation, with the
+  same calibration. Keep all of a plan's questions in one call; alone, each question is biased to
+  "yes".
+- **Dead band.** `question_verdict`: yes at >= 0.6, no at <= 0.4, unsure in between (matches
+  nothing). The constants are `QUESTION_YES_MIN` / `QUESTION_NO_MAX` in `bas_har/procedure/evidence.py`.
+- **No narrowing, no smoothing.** The questioner always asks the full set; smoothing was measured
+  to delay short events and was removed.
+- **Detector skipped when unused.** Zero-shot plans with only `visual_question` rules run no
+  detector (`detections_needed`), which keeps analysis at 25 fps.
+- **Hybrid mode** (`mode: hybrid`) = trained detector + questions. Verified live on the Slawosz
+  video (8/8, no alerts, ~0.6 s later than trained-only). Cost: the detector slows to ~70-100
+  ms/frame while the VLM runs; real time is kept by skipping frames.
+- **`melfi_zeroshot` plan v0.4.0**: five visible-only steps, three questions, 0.4 s hold. Live on the
+  new video: 5/5 during cycle 1, 1.4-2.3 s behind, no alerts, nothing during the glovebox footage.
+- **Studio fix**: the procedure builder now keeps `expect` ("done when: yes/no"); before, re-saving
+  a plan inverted any step whose first rule expected "no".
+- **Blocked / not done**: Qwen3-VL-4B needs 4-bit quantisation to fit live in 8 GB, and installing
+  `bitsandbytes` was refused by the permission system. Measured with CPU offload instead, it is
+  better on Slawosz frames but worse on the new video's camera angle, so it is not a clear win.
+- **Deployed v0.4.0 honestly**: new video 4/4 checkable steps; Slawosz 2/5 within 2.5 s, every miss
+  early rather than random. Answers shift with the question set, so test plans exactly as deployed.
+
+Test suite 207 passing, Ruff and formatting clean, React build clean as of this section.

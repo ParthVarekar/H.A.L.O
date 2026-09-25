@@ -26,7 +26,9 @@ from bas_har.procedure import (
     ColorSequenceTracker,
     ProcedureEngine,
     build_engine,
+    detections_needed,
     perception_needs,
+    question_verdict,
 )
 from bas_har.schema.activity_schema import (
     ActivityId,
@@ -38,6 +40,7 @@ from bas_har.schema.activity_schema import (
     TrainingPreset,
 )
 from bas_har.schema.cli import load_plan
+from bas_har.schema.display_schema import DisplaySettings
 from bas_har.schema.event_schema import EventRecord
 from bas_har.schema.plan_schema import ExperimentPlan
 from bas_har.schema.recognition_schema import ActivityRecognition
@@ -69,6 +72,8 @@ from bas_har.voice import ConfirmationSound
 from bas_har.web.frame_encoder import FrameEncoder
 
 STATIC_DIR = project_root() / "web" / "dist"
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("image/svg+xml", ".svg")
 DEFAULT_TARGET_CLASSES = ["box", "cup", "bottle", "bowl", "book", "orange", "banana", "apple"]
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 MAX_VIDEO_BYTES = 4_000_000_000
@@ -77,7 +82,10 @@ MAX_PLAYBACK_LAG_S = 0.5
 RECORDER_QUEUE_FRAMES = 50
 PERF_LOG_INTERVAL_S = 5.0
 STATUS_TIMING_INTERVAL_S = 0.5
-HEADER_HEIGHT = 76
+BOX_COLOR_BGR = (255, 157, 91)
+BOX_LABEL_BGR = (255, 214, 176)
+BOX_TAG_BGR = (16, 11, 8)
+BOX_LABEL_SCALE = 0.36
 
 
 def _is_file_source(source: int | str) -> bool:
@@ -102,6 +110,23 @@ def _nvidia_gpu_present() -> bool:
             pynvml.nvmlShutdown()
     except pynvml.NVMLError:
         return False
+
+
+def _activity_run_mode(registry: ActivityRegistry, activity_id: str) -> str:
+    """How an activity would be monitored: trained detector, described objects, or not at all."""
+    if activity_detector_path(registry, activity_id).is_file():
+        return "trained"
+    try:
+        plan = load_activity_plan(registry, activity_id)
+    except (FileNotFoundError, ValueError, ValidationError):
+        return "unavailable"
+    return "described" if any(obj.prompts for obj in plan.objects) else "unavailable"
+
+
+def _recognition_mode(zero_shot: bool, has_questions: bool) -> str:
+    if zero_shot:
+        return "zero_shot"
+    return "hybrid" if has_questions else "trained"
 
 
 def _cpu_fallback(device: str, gpu_present: bool) -> bool:
@@ -294,53 +319,44 @@ def _detection_dict(result: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _annotate_frame(
-    frame: Any, result: Any, state: str, confidence: float, description: str
-) -> Any:
+def _annotate_frame(frame: Any, result: Any) -> Any:
     import cv2
+    import numpy as np
 
+    font = cv2.FONT_HERSHEY_SIMPLEX
     for detection in result.detections:
         bbox = detection.bbox
-        top_left = (int(bbox.x1), int(bbox.y1))
-        bottom_right = (int(bbox.x2), int(bbox.y2))
-        cv2.rectangle(frame, top_left, bottom_right, (68, 216, 163), 2)
-        label = f"{detection.color + ' ' if detection.color else ''}{detection.cls} {detection.conf:.2f}"
+        x1, y1, x2, y2 = int(bbox.x1), int(bbox.y1), int(bbox.x2), int(bbox.y2)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), BOX_COLOR_BGR, 1, cv2.LINE_AA)
+        name = detection.cls.replace("__", " ").replace("_", " ")
+        label = f"{detection.color + ' ' if detection.color else ''}{name} {detection.conf:.0%}"
+        (width, height), _ = cv2.getTextSize(label, font, BOX_LABEL_SCALE, 1)
+        top = y1 - height - 5 if y1 - height - 5 >= 0 else y1 + 1
+        tag = frame[max(0, top) : top + height + 5, max(0, x1) : x1 + width + 6]
+        if tag.size:
+            cv2.addWeighted(tag, 0.3, np.full_like(tag, BOX_TAG_BGR), 0.7, 0, dst=tag)
         cv2.putText(
             frame,
             label,
-            (top_left[0], max(22, top_left[1] - 8)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            (68, 216, 163),
-            2,
+            (x1 + 3, top + height + 2),
+            font,
+            BOX_LABEL_SCALE,
+            BOX_LABEL_BGR,
+            1,
             cv2.LINE_AA,
         )
-    import numpy as np
-
-    strip = frame[:HEADER_HEIGHT]
-    cv2.addWeighted(np.full_like(strip, (8, 16, 30)), 0.85, strip, 0.15, 0, dst=strip)
-    current = description or "Procedure complete"
-    cv2.putText(
-        frame,
-        f"{state.upper()}  |  {current}",
-        (18, 30),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.62,
-        (240, 244, 250),
-        2,
-        cv2.LINE_AA,
-    )
-    cv2.putText(
-        frame,
-        f"Confidence {confidence:.0%}  |  Detections {len(result.detections)}",
-        (18, 59),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.52,
-        (173, 187, 209),
-        1,
-        cv2.LINE_AA,
-    )
     return frame
+
+
+def _render_frame(frame: Any, result: Any, show_boxes: bool) -> Any:
+    return _annotate_frame(frame.copy(), result) if show_boxes else frame
+
+
+def _encode_still(frame: Any) -> bytes | None:
+    import cv2
+
+    ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return encoded.tobytes() if ok else None
 
 
 class WebState:
@@ -352,6 +368,8 @@ class WebState:
         self.frame_ready = threading.Condition(self.lock)
         self.runner: SessionRunner | None = None
         self.frame_jpeg: bytes | None = None
+        self.last_render: tuple[Any, Any, int] | None = None
+        self.display = DisplaySettings()
         self.events: list[dict[str, Any]] = []
         self.status: dict[str, Any] = {
             "running": False,
@@ -387,6 +405,12 @@ class WebState:
             "encoder": None,
             "cpu_fallback": False,
             "falling_behind": False,
+            "mode": "trained",
+            "questions": 0,
+            "questions_answered": 0,
+            "answers": {},
+            "show_boxes": True,
+            "video_time_s": 0.0,
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -401,6 +425,7 @@ class WebState:
         first = self.plan.steps[0]
         with self.lock:
             self.frame_jpeg = None
+            self.last_render = None
             self.events.clear()
             self.status.update(
                 running=True,
@@ -426,6 +451,7 @@ class WebState:
                 has_frame=False,
                 started_at=None,
                 summary=None,
+                video_time_s=0.0,
             )
 
     def append_event(self, event: EventRecord) -> None:
@@ -451,6 +477,7 @@ class WebState:
             self.plan = plan
             self.plan_data = _plan_summary(plan)
             self.frame_jpeg = None
+            self.last_render = None
             self.events.clear()
             self.status.update(
                 running=False,
@@ -491,6 +518,24 @@ class WebState:
         with self.lock:
             return self.frame_jpeg, int(self.status["frame_id"])
 
+    def remember_render(self, frame: Any, result: Any, frame_id: int) -> None:
+        with self.lock:
+            self.last_render = (frame, result, frame_id)
+
+    def set_display(self, display: DisplaySettings) -> None:
+        """Apply display settings and redraw the still frame shown after a session ends."""
+        with self.lock:
+            self.display = display
+            self.status["show_boxes"] = display.show_boxes
+            last = self.last_render
+            running = bool(self.status["running"])
+        if last is None or running:
+            return
+        frame, result, frame_id = last
+        still = _encode_still(_render_frame(frame, result, display.show_boxes))
+        if still is not None:
+            self.set_frame(still, frame_id)
+
     def wait_for_frame(self, last_frame_id: int, timeout: float) -> tuple[bytes | None, int]:
         with self.frame_ready:
             self.frame_ready.wait_for(
@@ -515,10 +560,14 @@ class SessionRunner:
         realtime: bool | None = None,
         record_buffer: bool | None = None,
         upload: bool = False,
+        zero_shot: bool = False,
+        answer_questions: bool = True,
     ) -> None:
         self.state = state
         self.source = source
         self.yolo_model = yolo_model
+        self.zero_shot = zero_shot
+        self.answer_questions = answer_questions
         self.max_frames = max_frames
         self.device = device
         self.filter_default_classes = filter_default_classes
@@ -555,9 +604,10 @@ class SessionRunner:
             item = slot.take(timeout=0.5)
             if item is None:
                 continue
-            frame_id, frame, result, state, confidence, description = item
+            frame_id, frame, result = item
             began = time.perf_counter()
-            annotated = _annotate_frame(frame, result, state, confidence, description)
+            self.state.remember_render(frame, result, frame_id)
+            annotated = _render_frame(frame, result, self.state.display.show_boxes)
             drawn = time.perf_counter()
             encoded = encoder.encode(annotated)
             encoded_at = time.perf_counter()
@@ -605,6 +655,18 @@ class SessionRunner:
             with contextlib.suppress(queue.Full):
                 frames.put_nowait(frame)
 
+    def _build_questioner(self, questions: list[str]) -> Any | None:
+        if not questions:
+            return None
+        from bas_har.perception.vlm import AsyncVisualQuestioner, VisualQuestionAnswerer
+
+        self.state.update(message="Loading the vision-language model")
+        answerer = VisualQuestionAnswerer(
+            device=self.device,
+            context=f"You are watching {self.state.plan.name}.",
+        )
+        return AsyncVisualQuestioner(answerer, questions)
+
     def _run(self) -> None:
         from bas_har.io import CrcJsonlEventSink, VideoCaptureSource
         from bas_har.perception import PerceptionPipeline
@@ -644,6 +706,8 @@ class SessionRunner:
                 use_media_time=self.use_media_time,
             )
             needs_pose, needs_hands = perception_needs(self.state.plan)
+            questions = self.state.plan.visual_questions() if self.answer_questions else []
+            questioner = self._build_questioner(questions)
             pipeline = PerceptionPipeline(
                 yolo_model=self.yolo_model,
                 target_classes=DEFAULT_TARGET_CLASSES if self.filter_default_classes else None,
@@ -651,6 +715,9 @@ class SessionRunner:
                 run_hands=sequence is None and needs_hands,
                 device=self.device,
                 color_names=_plan_color_names(self.state.plan),
+                prompt_classes=self.state.plan.prompt_classes() if self.zero_shot else None,
+                questioner=questioner,
+                run_detector=not self.zero_shot or detections_needed(self.state.plan),
             )
             encoder = FrameEncoder(device=pipeline.device)
             self.state.update(message="Warming up the detector")
@@ -691,6 +758,9 @@ class SessionRunner:
                 encoder=encoder.backend,
                 cpu_fallback=_cpu_fallback(pipeline.device, _nvidia_gpu_present()),
                 falling_behind=False,
+                mode=_recognition_mode(self.zero_shot, bool(questions)),
+                questions=len(questions),
+                questions_answered=0,
             )
             clock = PlaybackClock(fps, self.stop_event) if self.realtime else None
             started = time.perf_counter()
@@ -761,7 +831,7 @@ class SessionRunner:
                 self.timer.record("engine", engine_done - detected)
                 current = self.state.plan.steps_dict.get(display_step_id)
                 description = current.description if current is not None else "Procedure complete"
-                slot.put((frame_id, frame, result, display_state, display_confidence, description))
+                slot.put((frame_id, frame, result))
                 analysed += 1
                 now = time.perf_counter()
                 elapsed = now - started
@@ -785,11 +855,23 @@ class SessionRunner:
                     last_status = now
                     video_s = (frame_id + 1) / max(fps, 1.0)
                     values.update(
+                        video_time_s=round(video_s, 1),
                         realtime_factor=round(video_s / max(elapsed, 0.001), 2),
                         lag_s=round(max(0.0, lag), 3),
                         timings_ms=self.timer.snapshot(),
                         falling_behind=lag > MAX_PLAYBACK_LAG_S / 2,
                     )
+                    if questioner is not None:
+                        values.update(
+                            questions_answered=questioner.answered,
+                            answers={
+                                question: {
+                                    "p": round(probability, 2),
+                                    "verdict": question_verdict(probability),
+                                }
+                                for question, probability in result.questions.items()
+                            },
+                        )
                 self.state.update(**values)
                 if now - last_perf >= PERF_LOG_INTERVAL_S and perf_handle is not None:
                     last_perf = now
@@ -813,6 +895,8 @@ class SessionRunner:
             self.state.update(running=False, message="Capture error", error=str(exc))
         finally:
             slot.close()
+            if questioner is not None:
+                questioner.close()
             if presenter is not None:
                 presenter.join(timeout=5)
             if recording is not None:
@@ -900,6 +984,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         "has_detector": activity_detector_path(
                             self.server.registry, manifest.activity_id
                         ).is_file(),
+                        "mode": _activity_run_mode(self.server.registry, manifest.activity_id),
                     }
                     for manifest in self.server.registry.list_activities()
                 ]
@@ -1215,13 +1300,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except (FileNotFoundError, ValueError, ValidationError) as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
-        if parsed.path not in {"/api/activities", "/api/start", "/api/stop", "/api/silence"}:
+        if parsed.path not in {
+            "/api/activities",
+            "/api/start",
+            "/api/stop",
+            "/api/silence",
+            "/api/display",
+        }:
             self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
             return
         try:
             payload = self._read_json()
             if parsed.path == "/api/activities":
                 self._create_activity(payload)
+            elif parsed.path == "/api/display":
+                display = DisplaySettings.model_validate(payload)
+                self.server.state.set_display(display)
+                self._send_json(display.model_dump())
             elif parsed.path == "/api/start":
                 self._start(payload)
             elif parsed.path == "/api/stop":
@@ -1561,11 +1656,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             video.unlink(missing_ok=True)
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
-        if not detector.is_file():
+        zero_shot = not detector.is_file()
+        if zero_shot and not any(obj.prompts for obj in plan.objects):
             video.unlink(missing_ok=True)
             self.server.state.update(
                 analysis=analysis,
-                message="Experiment recognised, but it has no trained detector for step monitoring",
+                message="Experiment recognised, but it has no trained detector and no object descriptions",
             )
             self._send_json(analysis)
             return
@@ -1583,6 +1679,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             use_media_time=True,
             realtime=True,
             upload=True,
+            zero_shot=zero_shot,
         )
         self.server.state.set_runner(runner)
         runner.start()

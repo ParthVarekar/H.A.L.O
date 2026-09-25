@@ -30,6 +30,8 @@ from bas_har.schema.plan_schema import (
 INSIDE_MIN_FRACTION = 0.8
 STATE_CONFLICT_IOU = 0.5
 COMPLETION_RATIO = 0.8
+QUESTION_YES_MIN = 0.6
+QUESTION_NO_MAX = 0.4
 
 
 def _iou(first: BBox, second: BBox) -> float:
@@ -61,6 +63,25 @@ def resolve_state_conflicts(result: PerceptionResult) -> PerceptionResult:
     if len(kept) == len(detections):
         return result
     return replace(result, detections=kept)
+
+
+def question_verdict(probability: float) -> str:
+    """yes, no, or unsure: answers between the two cut-offs count as neither."""
+    if probability >= QUESTION_YES_MIN:
+        return "yes"
+    if probability <= QUESTION_NO_MAX:
+        return "no"
+    return "unsure"
+
+
+DETECTION_RULE_KINDS = frozenset(
+    {"object_visible", "object_state", "object_location", "hand_object_interaction"}
+)
+
+
+def detections_needed(plan: ExperimentPlan) -> bool:
+    """Whether any step reads object detections; a questions-only plan does not."""
+    return any(rule.kind in DETECTION_RULE_KINDS for step in plan.steps for rule in step.evidence)
 
 
 def perception_needs(plan: ExperimentPlan) -> tuple[bool, bool]:
@@ -149,6 +170,8 @@ class EvidenceAccumulator:
             return self._eval_location(rule, result)
         if rule.kind == "actor_visible":
             return self._eval_actor(result)
+        if rule.kind == "visual_question":
+            return self._eval_question(rule, result)
         return False, 0.0, f"unknown rule kind: {rule.kind}"
 
     def _eval_hoi(self, rule: EvidenceRule, result: PerceptionResult) -> tuple[bool, float, str]:
@@ -282,6 +305,21 @@ class EvidenceAccumulator:
                 if x < crossing_x:
                     inside = not inside
         return inside
+
+    def _eval_question(
+        self, rule: EvidenceRule, result: PerceptionResult
+    ) -> tuple[bool, float, str]:
+        if not rule.question:
+            return False, 0.0, "rule missing question"
+        if rule.question not in result.questions:
+            return False, 0.0, "not answered yet"
+        probability = result.questions[rule.question]
+        verdict = question_verdict(probability)
+        if verdict == "unsure":
+            return False, 0.0, f"unsure ({probability:.2f})"
+        if verdict != rule.expect:
+            return False, 0.0, f"answered {verdict} ({probability:.2f})"
+        return True, probability if verdict == "yes" else 1.0 - probability, "ok"
 
     def _eval_actor(self, result: PerceptionResult) -> tuple[bool, float, str]:
         if result.pose is None:

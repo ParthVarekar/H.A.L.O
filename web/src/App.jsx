@@ -1,6 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  AppBar,
+  Callout,
+  DetailsPanel,
+  DropOverlay,
+  LiveSourceRow,
+  MetricStrip,
+  ModelAnswers,
+  ProcedurePanel,
+  SessionHeader,
+  SessionLog,
+  VideoStage,
+  formatVideoTime,
+} from "./Operations";
 import TrainingStudio from "./TrainingStudio";
+import { Announcer, ownsVoice, startVoiceOwnership } from "./voice";
+
+const RECOGNITION_MODES = {
+  zero_shot: "Described mode",
+  hybrid: "Trained detector + questions",
+  trained: "Trained detector",
+};
 
 const EMPTY_STATUS = {
   running: false,
@@ -9,7 +30,7 @@ const EMPTY_STATUS = {
   fps: 0,
   state: "idle",
   current_step_id: "",
-  current_step_description: "Waiting for a procedure plan",
+  current_step_description: "",
   next_step_id: null,
   confidence: 0,
   detections: [],
@@ -21,7 +42,22 @@ const EMPTY_STATUS = {
   device: "auto",
   summary: null,
   analysis: null,
+  mode: "trained",
+  questions: 0,
+  questions_answered: 0,
+  answers: {},
+  show_boxes: true,
+  video_time_s: 0,
 };
+
+const SESSION_LOG_LIMIT = 500;
+const LOG_DISPLAY_LIMIT = 200;
+const UPLOAD_PATH = /[\\/]logs[\\/]uploads[\\/]/;
+const BOXES_PREFERENCE_KEY = "bas-har-show-boxes";
+
+const SPEECH_RATE = 1.5;
+const SPEECH_LABEL_WORDS = 8;
+const SPEECH_CLAUSE_BREAK = /\s+(?:and|with|inside|into|in front|of)\s+/i;
 
 async function readJson(path, options) {
   const response = await fetch(path, options);
@@ -32,20 +68,41 @@ async function readJson(path, options) {
   return data;
 }
 
-function formatTime(value) {
-  if (!value) return "--:--:--";
+function formatClock(value) {
+  if (!value) return "";
   return new Date(value).toLocaleTimeString([], { hour12: false });
 }
 
-function formatEventTime(event) {
-  const videoTime = event.extra?.video_time_s;
-  return typeof videoTime === "number" ? `${videoTime.toFixed(1)}s` : formatTime(event.ts_utc);
+function baseName(path) {
+  return path ? String(path).split(/[\\/]/).pop() : "";
 }
 
-const SPEECH_RATE = 1.5;
-const SPEECH_LABEL_WORDS = 8;
-const SPEECH_CLAUSE_BREAK = /\s+(?:and|with|inside|into|in front|of)\s+/i;
-const SPEECH_MAX_PENDING = 2;
+function shortGpuName(hardware) {
+  if (!hardware) return "";
+  if (!hardware.cuda_available) return "CPU only";
+  return (hardware.device_name || hardware.device || "GPU").replace(/^NVIDIA\s+(GeForce\s+)?/i, "");
+}
+
+function readBoxesPreference() {
+  try {
+    const stored = window.localStorage.getItem(BOXES_PREFERENCE_KEY);
+    return stored === null ? null : stored !== "off";
+  } catch {
+    return null;
+  }
+}
+
+function writeBoxesPreference(showBoxes) {
+  try {
+    window.localStorage.setItem(BOXES_PREFERENCE_KEY, showBoxes ? "on" : "off");
+  } catch {
+    return;
+  }
+}
+
+function capitalise(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
 
 let audioContext = null;
 
@@ -75,82 +132,16 @@ function playTone(frequency, durationMs, repeats = 1) {
   }
 }
 
-function describeCompletions(steps) {
-  if (steps.length === 1) return `Step ${steps[0].number} done, ${steps[0].label}.`;
-  const numbers = steps.map((step) => step.number);
-  const consecutive = numbers.every((number, index) => index === 0 || number === numbers[index - 1] + 1);
-  if (steps.length === 2) return `Steps ${numbers[0]} and ${numbers[1]} done.`;
-  if (consecutive) return `Steps ${numbers[0]} to ${numbers[numbers.length - 1]} done.`;
-  return `Steps ${numbers.slice(0, -1).join(", ")} and ${numbers[numbers.length - 1]} done.`;
-}
-
 function eventKey(event) {
   return `${event.ts_utc}|${event.step_id}|${event.step_status}|${event.alert_code || ""}`;
 }
 
-function StateBadge({ state, running }) {
-  const label = running ? state.replaceAll("_", " ") : "stopped";
-  return <span className={`state-badge ${running ? "is-live" : "is-idle"}`}>{label}</span>;
-}
-
-function AnalysisResult({ analysis, activities, summary, running, steps, currentStepId }) {
-  const describe = (stepId) => steps.find((step) => step.id === stepId)?.description || stepId;
-  const match =
-    analysis.scores.find((score) => score.activity_id === analysis.activity_id) ||
-    activities.find((activity) => activity.id === analysis.activity_id);
-  const manual = analysis.recognized && analysis.sampled_frames === 0;
-  return (
-    <div className="analysis-result">
-      <div className={`analysis-verdict ${analysis.recognized ? "is-recognized" : "is-unknown"}`}>
-        <strong>{analysis.recognized ? `${manual ? "Selected" : "Recognised"}: ${match?.name || analysis.activity_id}` : "Experiment not recognised"}</strong>
-        <span>{analysis.reason}</span>
-      </div>
-      {analysis.scores.length > 0 && (
-        <div className="analysis-scores">
-          {analysis.scores.map((score) => (
-            <div className="analysis-score" key={score.activity_id}>
-              <div className="analysis-score-label"><span>{score.name}</span><b>{Math.round(score.score * 100)}% of frames</b></div>
-              <div className="confidence-track"><div style={{ width: `${Math.min(100, score.score * 100)}%` }} /></div>
-              <small>Scene similarity {Math.round(score.mean_similarity * 100)}% · {score.has_detector ? "detector trained" : "no trained detector"}</small>
-            </div>
-          ))}
-        </div>
-      )}
-      {analysis.recognized && match && !match.has_detector && (
-        <div className="notice-banner">Step monitoring is unavailable: this activity has no trained detector yet.</div>
-      )}
-      {analysis.recognized && running && (
-        <div className="notice-banner">Monitoring the procedure. Current step: {describe(currentStepId)}</div>
-      )}
-      {analysis.recognized && !running && summary && (
-        <div className="analysis-summary">
-          <strong>
-            {summary.completed_steps.length} of {summary.total_steps} steps completed
-            {summary.source_finished ? "" : " (analysis stopped before the end of the video)"}
-          </strong>
-          <ul>
-            {steps.map((step) => {
-              const done = summary.completed_steps.includes(step.id);
-              const late = (summary.out_of_order_steps || []).includes(step.id);
-              const skipped = (summary.skipped_steps || []).includes(step.id);
-              const note = late ? " (out of order)" : skipped ? " (skipped)" : done ? "" : " (not reached)";
-              return (
-                <li className={done ? "done" : "missed"} key={step.id}>
-                  <span>{done ? "✓" : "✗"}</span>
-                  {step.description}
-                  {note && <em>{note}</em>}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
+function isAlertEvent(event) {
+  return event.step_status === "skipped" || Boolean(event.alert_code);
 }
 
 function App() {
-  const [plan, setPlan] = useState({ name: "BAS-HAR", id: "", steps: [] });
+  const [plan, setPlan] = useState({ name: "", id: "", steps: [] });
   const [status, setStatus] = useState(EMPTY_STATUS);
   const [events, setEvents] = useState([]);
   const [source, setSource] = useState("");
@@ -159,21 +150,46 @@ function App() {
   const [workspace, setWorkspace] = useState(() => new URLSearchParams(window.location.search).get("workspace") === "studio" ? "studio" : "operations");
   const [operationActivities, setOperationActivities] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [connected, setConnected] = useState(true);
+  const [hardware, setHardware] = useState(null);
   const [localAnalysis, setLocalAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceHere, setVoiceHere] = useState(true);
   const [analyzableActivities, setAnalyzableActivities] = useState([]);
   const [selectedExperiment, setSelectedExperiment] = useState("");
+  const [previewPlan, setPreviewPlan] = useState(null);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [sessionLog, setSessionLog] = useState([]);
+  const [logFilter, setLogFilter] = useState("all");
+  const [dismissedAlert, setDismissedAlert] = useState(null);
+  const [showBoxes, setShowBoxes] = useState(() => readBoxesPreference() ?? true);
+  const [stillVersion, setStillVersion] = useState(0);
+
+  const spokenEvents = useRef(null);
+  const spokenSummary = useRef(undefined);
+  const sessionKey = useRef(null);
+  const planRevision = useRef(null);
+  const boxesSynced = useRef(false);
+  const pendingBoxes = useRef(null);
+  const announcer = useRef(null);
+  if (announcer.current === null) announcer.current = new Announcer(SPEECH_RATE);
 
   useEffect(() => {
     readJson("/api/analyze/activities").then(setAnalyzableActivities).catch(() => setAnalyzableActivities([]));
+    readJson("/api/hardware").then(setHardware).catch(() => setHardware(null));
   }, []);
-  const spokenEvents = useRef(null);
-  const spokenSummary = useRef(undefined);
 
-  const planRevision = useRef(null);
+  useEffect(() => startVoiceOwnership(), []);
+
+  useEffect(() => {
+    const update = () => setVoiceHere(ownsVoice());
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -192,10 +208,12 @@ function App() {
       }
       setStatus(nextStatus);
       setEvents(nextEvents);
-      setSource((current) => current || nextStatus.source || "");
+      setSource((current) => current || (UPLOAD_PATH.test(nextStatus.source || "") ? "" : nextStatus.source || ""));
       setError(nextStatus.error || "");
+      setConnected(true);
       setLoaded(true);
     } catch (requestError) {
+      setConnected(false);
       setError(requestError.message);
     }
   }, []);
@@ -217,6 +235,89 @@ function App() {
       window.removeEventListener("drop", blockNavigation);
     };
   }, []);
+
+  const applyBoxes = useCallback(async (next) => {
+    pendingBoxes.current = next;
+    setShowBoxes(next);
+    try {
+      await readJson("/api/display", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ show_boxes: next }),
+      });
+      setStillVersion((version) => version + 1);
+      await refresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      pendingBoxes.current = null;
+    }
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (!boxesSynced.current) {
+      boxesSynced.current = true;
+      const saved = readBoxesPreference();
+      if (saved !== null && saved !== status.show_boxes) {
+        applyBoxes(saved);
+        return;
+      }
+    }
+    if (pendingBoxes.current === null && status.show_boxes !== showBoxes) {
+      setShowBoxes(status.show_boxes);
+      setStillVersion((version) => version + 1);
+    }
+  }, [loaded, status.show_boxes, showBoxes, applyBoxes]);
+
+  function changeShowBoxes(next) {
+    writeBoxesPreference(next);
+    applyBoxes(next);
+  }
+
+  useEffect(() => {
+    const key = status.started_at || "none";
+    const reset = sessionKey.current !== key;
+    sessionKey.current = key;
+    setSessionLog((current) => {
+      const base = reset ? [] : current;
+      const seen = new Set(base.map((entry) => entry.key));
+      const additions = events
+        .filter((event) => !seen.has(eventKey(event)))
+        .map((event) => ({ ...event, key: eventKey(event) }));
+      if (!reset && additions.length === 0) return current;
+      return [...base, ...additions].slice(-SESSION_LOG_LIMIT);
+    });
+    if (reset) setDismissedAlert(null);
+  }, [events, status.started_at]);
+
+  useEffect(() => {
+    if (!selectedExperiment) {
+      setPreviewPlan(null);
+      return undefined;
+    }
+    let cancelled = false;
+    readJson(`/api/activities/${encodeURIComponent(selectedExperiment)}/plan`)
+      .then((selected) => {
+        if (cancelled) return;
+        setPreviewPlan({
+          id: selected.id,
+          name: selected.name,
+          version: selected.version,
+          steps: selected.steps.map((step) => ({
+            id: step.id,
+            description: step.description,
+            evidence: step.evidence.map((rule) => rule.kind),
+          })),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewPlan(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedExperiment]);
 
   const describeStep = useCallback(
     (stepId) => (plan.steps.find((step) => step.id === stepId)?.description || (stepId || "unknown step").replaceAll("_", " ")).replace(/[.\s]+$/, ""),
@@ -243,82 +344,16 @@ function App() {
     [describeStep],
   );
 
-  const speechQueue = useRef({ messages: [], steps: [], current: null });
-
-  const flushSpeech = useCallback(() => {
-    if (!("speechSynthesis" in window)) return;
-    const queue = speechQueue.current;
-    if (queue.current) return;
-    let text = null;
-    let kind = null;
-    if (queue.messages.length) {
-      const next = queue.messages.shift();
-      text = next.text;
-      kind = next.kind;
-    } else if (queue.steps.length) {
-      const steps = queue.steps.splice(0).sort((a, b) => a.number - b.number);
-      text = describeCompletions(steps);
-      kind = "steps";
-    }
-    if (!text) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = SPEECH_RATE;
-    const token = { kind, utterance };
-    const finish = () => {
-      if (queue.current === token) {
-        queue.current = null;
-        flushSpeech();
-      }
-    };
-    utterance.onend = finish;
-    utterance.onerror = finish;
-    queue.current = token;
-    window.speechSynthesis.speak(utterance);
-  }, []);
-
   const say = useCallback(
     (text, kind = "info") => {
-      if (!voiceOn || !("speechSynthesis" in window)) return;
-      const queue = speechQueue.current;
-      if (kind === "alert") {
-        queue.messages = [{ text, kind }, ...queue.messages.filter((item) => item.kind === "alert")];
-        if (queue.current && queue.current.kind !== "alert") {
-          queue.current = null;
-          window.speechSynthesis.cancel();
-        }
-      } else if (kind === "summary") {
-        queue.messages = [{ text, kind }];
-        queue.steps = [];
-        if (queue.current) {
-          queue.current = null;
-          window.speechSynthesis.cancel();
-        }
-      } else {
-        queue.messages = [...queue.messages.slice(-(SPEECH_MAX_PENDING - 1)), { text, kind }];
-      }
-      flushSpeech();
+      if (!voiceOn || !ownsVoice()) return;
+      announcer.current.enqueue(text, kind);
     },
-    [voiceOn, flushSpeech],
-  );
-
-  const announceStep = useCallback(
-    (stepId) => {
-      if (!voiceOn || !("speechSynthesis" in window)) return;
-      const number = stepNumber(stepId);
-      if (number === null) return;
-      const queue = speechQueue.current;
-      if (!queue.steps.some((item) => item.number === number)) {
-        queue.steps.push({ number, label: shortStep(stepId) });
-      }
-      flushSpeech();
-    },
-    [voiceOn, stepNumber, shortStep, flushSpeech],
+    [voiceOn],
   );
 
   useEffect(() => {
-    if (voiceOn || !("speechSynthesis" in window)) return;
-    speechQueue.current = { messages: [], steps: [], current: null };
-    window.speechSynthesis.cancel();
+    if (!voiceOn) announcer.current.clear();
   }, [voiceOn]);
 
   useEffect(() => {
@@ -331,24 +366,21 @@ function App() {
       const key = eventKey(event);
       if (spokenEvents.current.has(key)) continue;
       spokenEvents.current.add(key);
+      if (!voiceOn || !ownsVoice()) continue;
       const number = stepNumber(event.step_id);
-      const name = number ? `step ${number}` : describeStep(event.step_id);
-      const alerting = event.step_status === "skipped" || Boolean(event.alert_code);
-      if (voiceOn && (alerting || event.step_status === "completed")) {
-        if (alerting) playTone(440, 160, 2);
-        else playTone(880, 90);
-      }
-      if (event.step_status === "skipped") {
-        say(`Alert: ${name} skipped.`, "alert");
-      } else if (event.alert_code === "OUT_OF_ORDER") {
-        say(`Alert: ${name} done out of order.`, "alert");
-      } else if (event.alert_code === "PAUSE_EXCEEDED") {
-        say(`Alert: no progress on ${name}.`, "alert");
+      const name = number ? `Step ${number}` : capitalise(describeStep(event.step_id));
+      if (isAlertEvent(event)) {
+        playTone(440, 160, 2);
+        if (event.step_status === "skipped") say(`Alert. ${name} skipped.`, "alert");
+        else if (event.alert_code === "OUT_OF_ORDER") say(`Alert. ${name} done out of order.`, "alert");
+        else if (event.alert_code === "PAUSE_EXCEEDED") say(`Alert. No progress on ${name.toLowerCase()}.`, "alert");
+        else say(`Alert on ${name.toLowerCase()}.`, "alert");
       } else if (event.step_status === "completed") {
-        announceStep(event.step_id);
+        playTone(880, 90);
+        say(`${name} done. ${capitalise(shortStep(event.step_id))}.`, "step");
       }
     }
-  }, [loaded, events, voiceOn, say, announceStep, stepNumber, describeStep]);
+  }, [loaded, events, voiceOn, say, stepNumber, describeStep, shortStep]);
 
   useEffect(() => {
     const unlock = () => unlockAudio();
@@ -386,16 +418,148 @@ function App() {
     );
   }, [loaded, status.summary, status.running, status.started_at, say, stepNumber, describeStep]);
 
-  const currentIndex = useMemo(
-    () => plan.steps.findIndex((step) => step.id === status.current_step_id),
-    [plan.steps, status.current_step_id],
-  );
-  const completed = status.state === "completed";
-  const progress = completed ? plan.steps.length : Math.max(0, currentIndex + 1);
-  const imageUrl = status.has_frame
-    ? `/api/stream.mjpg?session=${encodeURIComponent(status.started_at || "current")}`
-    : "";
+  const frameSession = encodeURIComponent(status.started_at || "current");
+  const imageUrl = !status.has_frame
+    ? ""
+    : status.running
+      ? `/api/stream.mjpg?session=${frameSession}`
+      : `/api/frame.jpg?session=${frameSession}&v=${stillVersion}`;
   const analysis = status.analysis || localAnalysis;
+  const showingPreview = Boolean(previewPlan) && !status.running && previewPlan.id !== plan.id;
+  const displayPlan = showingPreview ? previewPlan : plan;
+  const finishedSummary = status.running ? null : status.summary;
+
+  const toLogEntry = useCallback(
+    (event) => {
+      const number = stepNumber(event.step_id);
+      const label = number ? `Step ${number}` : describeStep(event.step_id);
+      const time = formatVideoTime(event.extra?.video_time_s) || formatClock(event.ts_utc);
+      const base = { key: event.key, time, detail: describeStep(event.step_id), technical: event.evidence_summary };
+      if (event.step_status === "skipped") return { ...base, tone: "danger", icon: "skip", title: `${label} skipped`, isAlert: true };
+      if (event.alert_code === "OUT_OF_ORDER") return { ...base, tone: "warn", icon: "clock", title: `${label} done out of order`, isAlert: true };
+      if (event.alert_code === "PAUSE_EXCEEDED") return { ...base, tone: "warn", icon: "alert", title: `No progress on ${label.toLowerCase()}`, isAlert: true };
+      if (event.alert_code) {
+        const code = event.alert_code.replaceAll("_", " ").toLowerCase();
+        return { ...base, tone: "danger", icon: "alert", title: `${capitalise(code)} on ${label.toLowerCase()}`, isAlert: true };
+      }
+      if (event.step_status === "completed") return { ...base, tone: "ok", icon: "check", title: `${label} completed`, isStep: true };
+      if (event.step_status === "anomalous") return { ...base, tone: "warn", icon: "alert", title: `Unusual evidence on ${label.toLowerCase()}` };
+      return { ...base, tone: "muted", icon: "dot", title: `${label} evidence ${Math.round(event.confidence * 100)}%`, isUpdate: true };
+    },
+    [stepNumber, describeStep],
+  );
+
+  const logEntries = useMemo(() => sessionLog.map(toLogEntry).reverse(), [sessionLog, toLogEntry]);
+  const logCounts = useMemo(
+    () => ({
+      all: logEntries.filter((entry) => !entry.isUpdate).length,
+      steps: logEntries.filter((entry) => entry.isStep).length,
+      alerts: logEntries.filter((entry) => entry.isAlert).length,
+      evidence: logEntries.filter((entry) => entry.isUpdate).length,
+    }),
+    [logEntries],
+  );
+  const visibleLog = useMemo(() => {
+    const filtered = logEntries.filter((entry) => {
+      if (logFilter === "steps") return entry.isStep;
+      if (logFilter === "alerts") return entry.isAlert;
+      if (logFilter === "evidence") return entry.isUpdate;
+      return !entry.isUpdate;
+    });
+    return filtered.slice(0, LOG_DISPLAY_LIMIT);
+  }, [logEntries, logFilter]);
+
+  const latestAlert = useMemo(() => {
+    for (let index = sessionLog.length - 1; index >= 0; index -= 1) {
+      if (isAlertEvent(sessionLog[index])) return sessionLog[index];
+    }
+    return null;
+  }, [sessionLog]);
+  const activeAlert = latestAlert && latestAlert.key !== dismissedAlert ? toLogEntry(latestAlert) : null;
+
+  const stepsView = useMemo(() => {
+    if (showingPreview) return displayPlan.steps.map((step) => ({ ...step, state: "pending" }));
+    const completedIds = new Set(finishedSummary?.completed_steps || []);
+    const skippedIds = new Set(finishedSummary?.skipped_steps || []);
+    const lateIds = new Set(finishedSummary?.out_of_order_steps || []);
+    const times = {};
+    for (const entry of sessionLog) {
+      if (entry.step_status === "completed") {
+        completedIds.add(entry.step_id);
+        if (times[entry.step_id] === undefined) times[entry.step_id] = entry.extra?.video_time_s;
+      } else if (entry.step_status === "skipped") {
+        skippedIds.add(entry.step_id);
+      }
+      if (entry.alert_code === "OUT_OF_ORDER") lateIds.add(entry.step_id);
+    }
+    const currentIndex = plan.steps.findIndex((step) => step.id === status.current_step_id);
+    return plan.steps.map((step, index) => {
+      let state = "pending";
+      if (lateIds.has(step.id)) state = "late";
+      else if (completedIds.has(step.id)) state = "done";
+      else if (skippedIds.has(step.id)) state = "skipped";
+      else if (finishedSummary) state = "missed";
+      else if (status.running && step.id === status.current_step_id && status.state !== "completed") state = "current";
+      else if (status.running && currentIndex >= 0 && index < currentIndex) state = "done";
+      return { ...step, state, time: times[step.id] };
+    });
+  }, [showingPreview, displayPlan.steps, finishedSummary, sessionLog, plan.steps, status.current_step_id, status.running, status.state]);
+
+  const doneCount = stepsView.filter((step) => step.state === "done" || step.state === "late").length;
+  const currentStepIndex = stepsView.findIndex((step) => step.state === "current");
+
+  const result = useMemo(() => {
+    if (!finishedSummary || showingPreview) return null;
+    const total = finishedSummary.total_steps;
+    const done = finishedSummary.completed_steps.length;
+    const skipped = finishedSummary.skipped_steps || [];
+    const missed = finishedSummary.missed_steps || [];
+    const late = finishedSummary.out_of_order_steps || [];
+    const clean = done === total && skipped.length === 0 && late.length === 0;
+    const notes = [];
+    if (skipped.length) notes.push(`${skipped.length} skipped`);
+    if (late.length) notes.push(`${late.length} out of order`);
+    if (missed.length) notes.push(`${missed.length} not reached`);
+    if (!finishedSummary.source_finished) notes.push("stopped before the end of the video");
+    return {
+      tone: clean ? "ok" : "warn",
+      title: clean ? "All steps completed in order" : `${done} of ${total} steps completed`,
+      detail: notes.length ? capitalise(notes.join(" · ")) : null,
+      done,
+      total,
+    };
+  }, [finishedSummary, showingPreview]);
+
+  const recognitionNote = useMemo(() => {
+    if (!analysis?.recognized) return "";
+    if (analysis.sampled_frames === 0) return "procedure selected manually";
+    const match = analysis.scores.find((score) => score.activity_id === analysis.activity_id);
+    return match ? `recognised from the video (${Math.round(match.score * 100)}% of frames matched)` : "recognised from the video";
+  }, [analysis]);
+
+  let statusText = "Open a video or connect a live source to begin.";
+  let statusTone = "idle";
+  if (!connected) {
+    statusText = "Lost connection to the capture service. Retrying.";
+    statusTone = "danger";
+  } else if (analyzing) {
+    statusText = selectedExperiment ? "Uploading the video" : "Uploading and recognising the experiment";
+    statusTone = "busy";
+  } else if (status.running && !status.has_frame) {
+    statusText = status.message || "Starting";
+    statusTone = "busy";
+  } else if (status.running) {
+    statusText = recognitionNote ? capitalise(recognitionNote) : "Monitoring the procedure";
+    statusTone = "live";
+  } else if (showingPreview) {
+    statusText = "Selected. Open a video of this procedure to start monitoring.";
+  } else if (result) {
+    statusText = `${result.done} of ${result.total} steps completed${finishedSummary.source_finished ? "" : ", stopped early"}`;
+    statusTone = result.tone;
+  } else if (analysis && !analysis.recognized) {
+    statusText = "The last video was not recognised";
+    statusTone = "warn";
+  }
 
   async function startCapture() {
     setBusy(true);
@@ -406,6 +570,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source }),
       });
+      setLiveOpen(false);
       await refresh();
     } catch (requestError) {
       setError(requestError.message);
@@ -434,9 +599,7 @@ function App() {
     }
   }
 
-  async function selectActivity(event) {
-    const activityId = event.target.value;
-    if (!activityId) return;
+  async function selectActivity(activityId) {
     setBusy(true);
     setError("");
     try {
@@ -454,15 +617,23 @@ function App() {
     }
   }
 
+  function chooseExperiment(activityId) {
+    setSelectedExperiment(activityId);
+    if (activityId && operationActivities.some((activity) => activity.id === activityId)) {
+      selectActivity(activityId);
+    }
+  }
+
   async function analyzeFile(file) {
     if (!file) return;
     if (status.running) {
-      setAnalysisError("Stop the running capture before analysing another video.");
+      setAnalysisError("Stop the running session before analysing another video.");
       return;
     }
     setAnalyzing(true);
     setAnalysisError("");
     setLocalAnalysis(null);
+    setLiveOpen(false);
     try {
       const data = await readJson("/api/analyze", {
         method: "POST",
@@ -474,14 +645,14 @@ function App() {
       });
       setLocalAnalysis(data);
       const known = analyzableActivities.find((activity) => activity.id === data.activity_id);
-      const match = data.scores.find((score) => score.activity_id === data.activity_id) || known;
+      const name = known?.name || data.scores.find((score) => score.activity_id === data.activity_id)?.name || data.activity_id;
       const verb = selectedExperiment ? "Selected" : "Recognised";
       if (!data.recognized) {
         say("Experiment not recognised.");
-      } else if (match && !match.has_detector) {
-        say(`${verb} ${match.name}, but step monitoring is not available for it yet.`);
+      } else if (known?.mode === "unavailable") {
+        say(`${verb} ${name}, but it cannot be monitored yet.`);
       } else {
-        say(`${verb} ${match?.name || data.activity_id}. Monitoring.`);
+        say(`${verb} ${name}. Monitoring.`);
       }
       await refresh();
     } catch (requestError) {
@@ -508,217 +679,210 @@ function App() {
     analyzeFile(event.dataTransfer.files?.[0]);
   }
 
+  const locked = analyzing || status.running;
+  const sessionActive = status.running || Boolean(finishedSummary);
+  const modeLabel = sessionActive && !showingPreview ? RECOGNITION_MODES[status.mode] : "";
+  const recognisedActivity = analysis?.recognized
+    ? analyzableActivities.find((activity) => activity.id === analysis.activity_id)
+    : null;
+  const alertEntries = logEntries.filter((entry) => entry.isAlert);
+  const totalSteps = stepsView.length;
+  const currentStep = currentStepIndex >= 0 ? stepsView[currentStepIndex] : null;
+
+  const metrics = [
+    {
+      label: "Progress",
+      value: totalSteps ? `${doneCount} / ${totalSteps}` : "–",
+      progress: totalSteps ? doneCount / totalSteps : 0,
+      tone: sessionActive && !showingPreview ? (totalSteps && doneCount === totalSteps ? "ok" : "neutral") : "muted",
+    },
+    {
+      label: "Current step",
+      value: currentStep ? `Step ${currentStepIndex + 1}` : result ? "Finished" : status.running ? "Complete" : "–",
+      sub: currentStep ? capitalise(shortStep(currentStep.id)) : result ? result.title : status.running ? "Every step observed" : "Waiting for a video",
+      tone: sessionActive && !showingPreview ? "neutral" : "muted",
+    },
+    {
+      label: "Alerts",
+      value: sessionActive && !showingPreview ? String(alertEntries.length) : "–",
+      sub: alertEntries.length ? alertEntries[0].title : sessionActive ? "None raised" : "Skips and out-of-order steps",
+      tone: !sessionActive || showingPreview ? "muted" : alertEntries.length ? "danger" : "ok",
+    },
+    {
+      label: "Video time",
+      value: sessionActive && !showingPreview ? formatVideoTime(status.video_time_s || 0) : "–",
+      sub:
+        sessionActive && status.realtime_factor != null
+          ? `${status.realtime_factor.toFixed(2)}× real time · ${Number(status.fps || 0).toFixed(0)} fps`
+          : "Not running",
+      tone: sessionActive && !showingPreview ? "neutral" : "muted",
+    },
+  ];
+
+  let now = null;
+  if (analyzing) now = { label: "Starting", text: selectedExperiment ? "Uploading the video" : "Recognising the experiment" };
+  else if (status.running && currentStep) now = { label: `Step ${currentStepIndex + 1} of ${totalSteps}`, text: currentStep.description };
+  else if (status.running && status.has_frame) now = { label: "Complete", text: "Every step has been observed. Watching until the video ends." };
+  else if (status.running) now = { label: "Starting", text: status.message || "Preparing the models" };
+  else if (result) now = { label: "Finished", text: result.detail ? `${result.title}. ${result.detail}.` : `${result.title}.` };
+
+  const detailRows = [
+    ["Recognition", RECOGNITION_MODES[status.mode] || "Trained detector"],
+    ["Inference device", status.device || hardware?.device || "auto"],
+    ["GPU", hardware?.device_name || "None detected"],
+    ["Frame encoder", status.encoder || "Not started"],
+    ["Display rate", status.display_fps ? `${Number(status.display_fps).toFixed(1)} fps` : "Not started"],
+    ["Behind video", status.lag_s != null ? `${Number(status.lag_s).toFixed(2)} s` : "Not started"],
+    ["Source", baseName(status.source) || "None"],
+    ["Event log", baseName(status.log_path) || "Not started"],
+    ["Recording buffer", `${status.buffer_segment_count} segments`],
+    ["Plan", displayPlan.id || "Loading"],
+  ];
+
+  const notScored = analysis && !analysis.recognized && !analyzing;
+
   return (
-    <main
-      className="app-shell"
+    <div
+      className={`ops ${workspace === "studio" ? "is-studio" : ""}`}
       onDragOver={workspace === "operations" ? handleDragOver : undefined}
       onDragLeave={workspace === "operations" ? handleDragLeave : undefined}
       onDrop={workspace === "operations" ? handleDrop : undefined}
     >
-      <header className="topbar">
-        <div className="brand-lockup">
-          <div className="brand-mark">BH</div>
-          <div>
-            <div className="eyebrow">ON-BOARD ACTIVITY RECOGNITION</div>
-            <h1>bas-har</h1>
-          </div>
-        </div>
-        <div className="header-meta">
-          <nav className="workspace-nav" aria-label="Workspace">
-            <button className={workspace === "operations" ? "active" : ""} onClick={() => setWorkspace("operations")} type="button">Operations</button>
-            <button className={workspace === "studio" ? "active" : ""} onClick={() => setWorkspace("studio")} type="button">Training Studio</button>
-          </nav>
-          <span className="plan-chip">{plan.id || "plan loading"}</span>
-          {operationActivities.length > 0 && <select className="operation-select" value={operationActivities.some((activity) => activity.id === plan.id) ? plan.id : ""} onChange={selectActivity} disabled={busy} aria-label="Approved activity"><option value="">Select approved activity</option>{operationActivities.map((activity) => <option key={activity.id} value={activity.id}>{activity.name}</option>)}</select>}
-          <span className="connection"><span className="connection-dot" /> localhost:5767</span>
-        </div>
-      </header>
-
-      {workspace === "studio" ? <TrainingStudio /> : <>
-      <section className={`panel analyze-panel ${dragActive ? "is-dragging" : ""}`}>
-        <div className="analyze-head">
-          <div className="analyze-copy">
-            <span className="section-kicker">VIDEO ANALYSIS</span>
-            <h2>{dragActive ? "Release to analyse this video" : "Drop an experiment video anywhere on this page"}</h2>
-            <p>The video's scenes are matched against the stored takes of every activity package. If the match has a trained detector, its procedure is then monitored step by step, with spoken alerts and a final list of completed and missed steps.</p>
-          </div>
-          <div className="analyze-actions">
-            <label className="experiment-picker">
-              <span>Experiment</span>
-              <select
-                value={selectedExperiment}
-                onChange={(event) => setSelectedExperiment(event.target.value)}
-                disabled={analyzing || status.running}
-                aria-label="Experiment being performed"
-              >
-                <option value="">Auto-detect from video</option>
-                {analyzableActivities.map((activity) => (
-                  <option key={activity.id} value={activity.id}>
-                    {activity.name}{activity.has_detector ? "" : " (no trained detector)"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={`button button-primary file-button ${analyzing || status.running ? "is-disabled" : ""}`}>
-              {analyzing ? (selectedExperiment ? "Uploading…" : "Recognising…") : "Choose video"}
-              <input
-                type="file"
-                accept="video/*"
-                disabled={analyzing || status.running}
-                onChange={(event) => {
-                  analyzeFile(event.target.files?.[0]);
-                  event.target.value = "";
-                }}
-              />
-            </label>
-            <label className="voice-toggle">
-              <input type="checkbox" checked={voiceOn} onChange={(event) => setVoiceOn(event.target.checked)} />
-              Voice alerts
-            </label>
-          </div>
-        </div>
-        {analysisError && <div className="error-banner">{analysisError}</div>}
-        {analyzing && <div className="notice-banner">Uploading and recognising the experiment. This takes a few seconds per stored activity take.</div>}
-        {analysis && !analyzing && (
-          <AnalysisResult
-            analysis={analysis}
+      <AppBar workspace={workspace} onWorkspace={setWorkspace} connected={connected} gpuName={shortGpuName(hardware)} />
+      {workspace === "studio" ? (
+        <main className="app-shell">
+          <TrainingStudio />
+        </main>
+      ) : (
+        <main className="ops-main">
+          <SessionHeader
+            title={displayPlan.name || "Loading procedure"}
+            version={displayPlan.version}
+            modeLabel={modeLabel}
+            statusText={statusText}
+            statusTone={statusTone}
             activities={analyzableActivities}
-            summary={status.summary}
+            selectedExperiment={selectedExperiment}
+            onSelectExperiment={chooseExperiment}
             running={status.running}
-            steps={plan.steps}
-            currentStepId={status.current_step_id}
+            locked={locked}
+            onFile={analyzeFile}
+            liveOpen={liveOpen}
+            onToggleLive={() => setLiveOpen((open) => !open)}
+            onStop={stopCapture}
+            busy={busy}
+            voiceOn={voiceOn}
+            voiceHere={voiceHere}
+            onToggleVoice={() => setVoiceOn((on) => !on)}
           />
-        )}
-      </section>
 
-      <section className="hero-grid">
-        <article className="panel video-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="section-kicker">ASTRONAUT VIEW</span>
-              <h2>Live procedure feed</h2>
-            </div>
-            <StateBadge state={status.state} running={status.running} />
-          </div>
-          <div className="video-frame">
-            {imageUrl ? (
-              <img src={imageUrl} alt="Current capture frame" />
-            ) : (
-              <div className="video-empty">
-                <div className="pulse-ring" />
-                <strong>{status.message || "Waiting for capture"}</strong>
-                <span>Drop a video above, or start a video, webcam, or RTSP source below</span>
-              </div>
+          {liveOpen && !status.running && (
+            <LiveSourceRow source={source} onSource={setSource} onStart={startCapture} disabled={busy || locked} />
+          )}
+
+          <div className="ops-notices">
+            {activeAlert && (
+              <Callout
+                tone={activeAlert.tone === "danger" ? "danger" : "warn"}
+                icon={activeAlert.icon}
+                title={`${activeAlert.title} at ${activeAlert.time}`}
+                actions={
+                  <>
+                    {status.running && (
+                      <button className="ops-btn ops-btn--small" type="button" onClick={silenceAlerts}>
+                        Silence for 60 s
+                      </button>
+                    )}
+                    <button className="ops-btn ops-btn--small ops-btn--ghost" type="button" onClick={() => setDismissedAlert(latestAlert.key)}>
+                      Dismiss
+                    </button>
+                  </>
+                }
+              >
+                {activeAlert.detail}
+              </Callout>
             )}
-            <div className="video-overlay"><span className="rec-dot" /> {status.running ? "LIVE" : "STANDBY"}</div>
-            <div className="video-stats">
-              {status.fps.toFixed(1)} FPS <span>·</span> frame {Math.max(0, status.frame_id)}
-              {status.realtime_factor != null && <><span>·</span> {status.realtime_factor.toFixed(2)}x speed</>}
-            </div>
+            {(analysisError || (connected && error)) && (
+              <Callout tone="danger" title="Something went wrong">
+                {analysisError || error}
+              </Callout>
+            )}
+            {status.cpu_fallback && (
+              <Callout tone="danger" title="Running on the CPU although an NVIDIA GPU is present">
+                Start the dashboard with .venv\Scripts\python.exe (startup.bat does this) so detection uses the GPU.
+              </Callout>
+            )}
+            {status.running && status.falling_behind && (
+              <Callout tone="warn" title="Falling behind the video">
+                Some frames are being skipped so analysis keeps pace with real time.
+              </Callout>
+            )}
+            {notScored && (
+              <Callout tone="warn" title="Experiment not recognised">
+                {analysis.reason} Choose the procedure from the list and open the video again.
+                {analysis.scores.length > 0 && (
+                  <div className="ops-callout-scores">
+                    {analysis.scores.map((score) => (
+                      <div key={score.activity_id}>
+                        <span>{score.name}</span>
+                        <div className="ops-meter"><div style={{ width: `${Math.min(100, score.score * 100)}%` }} /></div>
+                        <span>{Math.round(score.score * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Callout>
+            )}
+            {recognisedActivity?.mode === "unavailable" && !status.running && (
+              <Callout tone="warn" title={`${recognisedActivity.name} cannot be monitored yet`}>
+                It has no trained detector and no object descriptions. Add either one in the Training Studio.
+              </Callout>
+            )}
           </div>
-          {status.cpu_fallback && (
-            <div className="error-banner">Running on the CPU although an NVIDIA GPU is present. Start the dashboard with .venv\Scripts\python.exe (startup.bat does this) so detection uses the GPU.</div>
-          )}
-          {status.running && status.falling_behind && (
-            <div className="notice-banner">Analysis is falling behind the video; some frames are being skipped to keep real speed.</div>
-          )}
-          {Object.keys(status.timings_ms || {}).length > 0 && (
-            <div className="perf-readout">
-              <span>{status.device || "auto"}</span>
-              <span>{status.encoder || "--"} JPEG</span>
-              <span>display {Number(status.display_fps || 0).toFixed(1)} fps</span>
-              {Object.entries(status.timings_ms).map(([stage, value]) => (
-                <span key={stage}>{stage} {Number(value).toFixed(1)} ms</span>
-              ))}
-            </div>
-          )}
-          <div className="source-row">
-            <label htmlFor="source">Capture source</label>
-            <input
-              id="source"
-              value={source}
-              onChange={(event) => setSource(event.target.value)}
-              placeholder="MP4 path, webcam index, or RTSP URL"
+
+          <MetricStrip metrics={metrics} />
+
+          <div className="ops-grid">
+            <VideoStage
+              imageUrl={imageUrl}
+              running={status.running}
+              finished={Boolean(finishedSummary)}
+              busyText={analyzing ? (selectedExperiment ? "Uploading the video" : "Recognising the experiment") : status.running ? status.message : ""}
+              onFile={analyzeFile}
+              onOpenLive={() => setLiveOpen(true)}
+              locked={locked}
+              now={now}
+              showBoxes={showBoxes}
+              onShowBoxes={changeShowBoxes}
             />
-            <button className="button button-primary" onClick={startCapture} disabled={busy || status.running}>
-              Start
-            </button>
-            <button className="button button-quiet" onClick={stopCapture} disabled={busy || !status.running}>
-              Stop
-            </button>
-          </div>
-          {error && <div className="error-banner">{error}</div>}
-          {!analysis && status.running && status.frame_id >= 0 && status.detections.length === 0 && (
-            <div className="notice-banner">Frames are arriving, but the selected model has no target detections yet. Use a fine-tuned model for the red/blue boxes.</div>
-          )}
-        </article>
-
-        <aside className="side-stack">
-          <article className="panel current-panel">
-            <div className="panel-heading compact">
-              <span className="section-kicker">CURRENT STEP</span>
-              <span className="step-count">{progress} / {plan.steps.length || "--"}</span>
+            <div className="ops-side">
+              <ProcedurePanel
+                steps={stepsView}
+                currentStepId={status.current_step_id}
+                confidence={status.confidence}
+                doneCount={doneCount}
+                result={result}
+              />
             </div>
-            <div className="step-id">{status.current_step_id || "--"}</div>
-            <p>{status.current_step_description}</p>
-            <div className="confidence-label"><span>Evidence confidence</span><strong>{Math.round(status.confidence * 100)}%</strong></div>
-            <div className="confidence-track"><div style={{ width: `${Math.min(100, status.confidence * 100)}%` }} /></div>
-            <div className="next-step"><span>NEXT</span><strong>{status.next_step_id || (completed ? "procedure complete" : "waiting")}</strong></div>
-          </article>
-          <article className="panel telemetry-panel">
-            <div className="panel-heading compact"><span className="section-kicker">TELEMETRY</span><span className="telemetry-live">{status.running ? "STREAMING" : "IDLE"}</span></div>
-            <div className="telemetry-grid">
-              <div><span>Detections</span><strong>{status.detections.length}</strong></div>
-              <div><span>Engine state</span><strong>{status.state.replaceAll("_", " ")}</strong></div>
-              <div><span>Inference</span><strong>{status.device || "auto"}</strong></div>
-              <div><span>Source</span><strong className="truncate">{status.source || "--"}</strong></div>
-              <div><span>Buffer</span><strong>{status.buffer_segment_count} segments</strong></div>
-              <div><span>Log</span><strong className="truncate">{status.log_path ? status.log_path.split("\\").pop() : "not started"}</strong></div>
+          </div>
+
+          <div className="ops-grid ops-grid--start">
+            <SessionLog entries={visibleLog} filter={logFilter} onFilter={setLogFilter} counts={logCounts} />
+            <div className="ops-stack">
+              {Object.keys(status.answers || {}).length > 0 && (
+                <ModelAnswers
+                  answers={status.answers}
+                  answered={status.questions_answered}
+                  modeLabel={RECOGNITION_MODES[status.mode] || "Model answers"}
+                />
+              )}
+              <DetailsPanel rows={detailRows} timings={Object.entries(status.timings_ms || {})} />
             </div>
-            <button className="silence-button" onClick={silenceAlerts} disabled={!status.running}>Silence alerts for 60s</button>
-          </article>
-        </aside>
-      </section>
-
-      <section className="lower-grid">
-        <article className="panel timeline-panel">
-          <div className="panel-heading">
-            <div><span className="section-kicker">PROCEDURE</span><h2>{plan.name}</h2></div>
-            <span className="muted-label">{plan.version || ""}</span>
           </div>
-          <div className="timeline">
-            {plan.steps.map((step, index) => {
-              const isCurrent = step.id === status.current_step_id;
-              const isDone = completed || (currentIndex >= 0 && index < currentIndex);
-              return (
-                <div className={`timeline-step ${isCurrent ? "current" : ""} ${isDone ? "done" : ""}`} key={step.id}>
-                  <div className="timeline-marker">{isDone ? "✓" : String(index + 1).padStart(2, "0")}</div>
-                  <div className="timeline-copy"><strong>{step.id.replaceAll("_", " ")}</strong><span>{step.description}</span></div>
-                  <span className="timeline-kind">{step.evidence.join(" + ")}</span>
-                </div>
-              );
-            })}
-          </div>
-        </article>
-
-        <article className="panel events-panel">
-          <div className="panel-heading"><div><span className="section-kicker">EVENT STREAM</span><h2>Recent events</h2></div><span className="event-count">{events.length}</span></div>
-          <div className="events-list">
-            {events.length === 0 ? (
-              <div className="events-empty">Engine events will appear here as evidence changes.</div>
-            ) : events.slice().reverse().map((event, index) => (
-              <div className="event-row" key={`${event.ts_utc}-${index}`}>
-                <div className={`event-icon ${event.alert_code ? "alert" : event.step_status === "completed" ? "complete" : "progress"}`}>{event.alert_code ? "!" : event.step_status === "completed" ? "✓" : "·"}</div>
-                <div className="event-copy"><strong>{event.step_id.replaceAll("_", " ")}</strong><span>{event.alert_code ? `${event.alert_code.replaceAll("_", " ").toLowerCase()} · ` : ""}{event.evidence_summary}</span></div>
-                <div className="event-meta"><b>{Math.round(event.confidence * 100)}%</b><span>{formatEventTime(event)}</span></div>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
-      </>}
-      <footer className="footer">BAS-HAR · {plan.name} · rule/procedure FSM primary · laptop edge target</footer>
-    </main>
+        </main>
+      )}
+      <DropOverlay active={dragActive && workspace === "operations"} />
+    </div>
   );
 }
 

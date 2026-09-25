@@ -120,3 +120,44 @@ The rows above describe the wrong video (Life Sciences Glovebox footage, since m
 | Rate limit: no new alerts within window_s of last | pass (`tests/test_procedure_engine.py::test_alerter_rate_limits`) |
 | Sink atomic: JSONL file appears only after close() | pass (`tests/test_procedure_engine.py::test_jsonl_sink_writes_atomically`) |
 | Engine emits to optional sink | pass (`tests/test_procedure_engine.py::test_engine_emits_to_optional_sink`) |
+
+## Described-not-trained (zero-shot) recognition (2026-09-22)
+
+Tested on `studying cells in space.mp4` (153.04 s, a different astronaut at the same MELFI
+freezer; MELFI is on screen for roughly the first 22 s). No boxes, no training, no detector file
+for this activity - the plan is `activities/melfi_zeroshot/plan.yaml` v0.3.0.
+
+| Check | Target | Evidence | Status |
+|---|---|---|---|
+| Trained detector on an unseen video | baseline for comparison | misses freezer/dewars/tray/sample; labels the glovebox `melfi_freezer` on 63% of frames | fail (expected) |
+| Text-prompted detection without training | generic objects found from descriptions | YOLOE + MobileCLIP finds person/gloves/tablet; MELFI-specific parts and states are not reliable from prompts alone | partial |
+| VLM question on a coarse state | usable accuracy on a video nobody trained on | "is the tray pulled out" accuracy 0.87, recall 0.94 | pass |
+| VLM question on a fine state | compartment lid, latch side | below 0.5 accuracy; not usable yet | fail |
+| Absence-phrased questions | any usable accuracy | recall 0.00 for "pushed back in" and "all doors closed"; accuracy 0.24 for "compartment closed" | fail (design changed to `expect: no`) |
+| Questions never block analysis | 25 fps analysis with the VLM running | `AsyncVisualQuestioner` on its own thread; run held 1.0x real time, 36 answers over 153 s | pass |
+| Zero-shot mode selected automatically | activity without `models/detector.pt` but with prompts | dashboard run reported `mode: zero_shot`, cuda:0, detect 35.4 ms/frame | pass |
+| Steps recognised on the unseen video | procedure followed from an English description only | steps 1-5 completed at 4.9, 8.5, 8.6, 13.7, 17.2 s, all inside the MELFI section, no alerts | partial (5 of 8) |
+| Closing steps not satisfied by unrelated footage | no completion once MELFI leaves frame | v0.2.0 falsely completed steps 6-8 at 35.7/54.6/59.3 s; v0.3.0 equipment-visible guard leaves them open | pass after fix |
+| Steps 2 and 3 distinguishable | separate completion times for separate actions | completed 0.12 s apart - too fast to be a real reading | fail |
+
+## Described mode, second pass (2026-09-23)
+
+Corrects the section above: the new video holds two MELFI cycles (cycle 1: door ~3.5 s, tray out
+4.0, sample out 5.0, tray back 6.5, door closed ~7.5; cycle 2: 16-21 s), and the
+"equipment visible" guard never worked. Question scores are on the owner's 55 boxed Slawosz
+frames, which the VLM has never seen.
+
+| Check | Target | Evidence | Status |
+|---|---|---|---|
+| Probabilities from one forward pass | as calibrated as generating, faster | tray out acc 0.98 at 0.5 (AUC 1.00); 0.61 s vs 2.85 s for 9 questions | pass |
+| Each question asked alone | usable at a 0.5 cut | biased to "yes": tray acc 0.45 at 0.5; grey-image calibration does not fix it | fail (not used) |
+| Zoom on the tray for the lid state | lid readable from a crop | oracle crop AUC 0.87 -> 0.91; the lid is under the glove | fail (not used) |
+| Uncertain answers ignored | a dead question cannot complete a step | dead band 0.6/0.4; `test_answers_between_the_cut_offs_are_unsure_and_match_nothing`; Slawosz wrong completions 5 -> 1 on cached answers | pass |
+| Questions-only plan skips the detector | full-rate analysis while the VLM runs | 25 fps analysis, detect 0.03 ms (was ~9 fps, 108 ms) | pass |
+| Zero-shot on the new video (v0.4.0) | steps in order, in the right cycle, none on unrelated footage | 5/5 during cycle 1, 1.4-2.3 s behind the action; nothing during 130 s of glovebox footage; no alerts | pass |
+| Hybrid mode (trained detector + questions) | runs live, same result as trained-only | Slawosz 8/8 in order, no alerts, each ~0.6 s later; `mode: hybrid` | pass |
+| Detector speed in hybrid mode | unchanged | ~9-18 ms -> ~70-100 ms per frame; real time kept by skipping frames | known cost |
+| Studio keeps `expect` | re-saving a plan does not invert a step | builder loads, edits and saves `expect` | pass (manual) |
+| Qwen3-VL-4B vs 2B | better end to end | better per frame on Slawosz (door AUC 0.96 vs 0.86) but worse on the new video's fisheye view (misses the tray) | not adopted |
+| Deployed v0.4.0 on Slawosz (unseen by the VLM) | steps within 2.5 s | 2/5; every miss early (2.7-5.7 s), none random | partial |
+| Deployed v0.4.0 on the new video (replay) | steps within 2.5 s | 4/4 checkable steps | pass |

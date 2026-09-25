@@ -272,7 +272,12 @@ def test_analyze_with_selected_activity_skips_recognition(tmp_path: Path) -> Non
         with urlopen(f"{base}/api/analyze/activities", timeout=5) as response:
             listed = json.loads(response.read().decode("utf-8"))
         assert listed == [
-            {"id": "sample_handling", "name": "Sample Handling", "has_detector": False}
+            {
+                "id": "sample_handling",
+                "name": "Sample Handling",
+                "has_detector": False,
+                "mode": "unavailable",
+            }
         ]
         request = Request(
             f"{base}/api/analyze",
@@ -331,6 +336,78 @@ def test_analyze_rejects_unsupported_file_type(tmp_path: Path) -> None:
             urlopen(request, timeout=5)
         assert caught.value.code == 400
         assert "unsupported video type" in json.loads(caught.value.read().decode("utf-8"))["error"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_activity_run_mode_reports_trained_described_or_unavailable(tmp_path: Path) -> None:
+    from bas_har.schema.plan_schema import ExperimentPlan
+    from bas_har.studio.plans import save_activity_plan
+    from bas_har.studio.recognition import activity_detector_path
+    from bas_har.web.server import _activity_run_mode
+
+    registry = ActivityRegistry(tmp_path)
+    plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    for activity_id in ("boxed", "described", "empty"):
+        registry.create(
+            ActivityManifest(id=activity_id, name=activity_id, kind=ActivityKind.EXPERIMENT)
+        )
+    payload = plan.model_dump(mode="json", by_alias=True)
+    payload["objects"][0]["prompts"] = ["a big cardboard box"]
+    payload["id"] = "described"
+    save_activity_plan(registry, "described", ExperimentPlan.model_validate(payload))
+    detector = activity_detector_path(registry, "boxed")
+    detector.parent.mkdir(parents=True, exist_ok=True)
+    detector.write_bytes(b"weights")
+
+    assert _activity_run_mode(registry, "boxed") == "trained"
+    assert _activity_run_mode(registry, "described") == "described"
+    assert _activity_run_mode(registry, "empty") == "unavailable"
+
+
+def test_display_toggle_redraws_the_still_frame_without_boxes() -> None:
+    from bas_har.perception.types import BBox, Detection, PerceptionResult
+
+    plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    state = WebState(plan)
+    frame = np.zeros((120, 160, 3), dtype=np.uint8)
+    result = PerceptionResult(
+        frame_id=7,
+        ts_ms=0,
+        width=160,
+        height=120,
+        detections=[Detection(cls="tray", conf=0.9, bbox=BBox(40, 40, 120, 100))],
+    )
+    state.remember_render(frame, result, 7)
+    server = DashboardServer(("127.0.0.1", 0), state, "models/yolo11n.pt", "cpu")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    def post_display(show_boxes: bool) -> dict:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/api/display",
+            data=json.dumps({"show_boxes": show_boxes}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request, timeout=2) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def still_brightness() -> float:
+        jpeg, frame_id = state.frame_snapshot()
+        assert jpeg is not None and frame_id == 7
+        return float(cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR).mean())
+
+    try:
+        assert post_display(False) == {"show_boxes": False}
+        assert state.snapshot()["show_boxes"] is False
+        hidden = still_brightness()
+        assert post_display(True) == {"show_boxes": True}
+        shown = still_brightness()
+        assert hidden < 1.0 < shown
+        assert frame.max() == 0
     finally:
         server.shutdown()
         server.server_close()

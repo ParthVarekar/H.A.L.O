@@ -24,6 +24,8 @@ const EMPTY_STEP = {
   label: "",
   state: "",
   inside_of: "",
+  question: "",
+  expect: "yes",
   extra_evidence: [],
   min_frames: 5,
   timeout_s: 60,
@@ -151,6 +153,7 @@ function TrainingStudio() {
             id: object.id,
             classes: object.classes.join(", "),
             colors_any: (object.colors_any || []).join(", "),
+            prompts: (object.prompts || []).join(", "),
             states: (object.states || []).join(", "),
           })),
           steps: (plan.steps || []).map((step) => {
@@ -164,6 +167,8 @@ function TrainingStudio() {
               label: rule.label || "",
               state: rule.state || "",
               inside_of: rule.inside_of || "",
+              question: rule.question || "",
+              expect: rule.expect || "yes",
               extra_evidence: step.evidence.slice(1),
               min_frames: rule.min_frames || 1,
               timeout_s: step.timeout_s || 60,
@@ -345,7 +350,7 @@ function TrainingStudio() {
       ...current,
       objects: [
         ...current.objects,
-        { id: `object_${current.objects.length + 1}`, classes: "", colors_any: "", states: "" },
+        { id: `object_${current.objects.length + 1}`, classes: "", colors_any: "", states: "", prompts: "" },
       ],
     }));
   }
@@ -426,6 +431,7 @@ function TrainingStudio() {
           id: object.id,
           classes: splitValues(object.classes),
           colors_any: splitValues(object.colors_any),
+          prompts: splitValues(object.prompts || ""),
           states: splitValues(object.states || ""),
         })),
         regions: loadedPlan?.regions || [],
@@ -439,6 +445,8 @@ function TrainingStudio() {
             ...(step.label ? { label: step.label } : {}),
             ...(step.state ? { state: step.state } : {}),
             ...(step.inside_of ? { inside_of: step.inside_of } : {}),
+            ...(step.question ? { question: step.question } : {}),
+            ...(step.kind === "visual_question" ? { expect: step.expect || "yes" } : {}),
             min_frames: Number(step.min_frames) || 1,
           }, ...(step.extra_evidence || [])],
           next: splitValues(step.next),
@@ -862,6 +870,7 @@ function TrainingStudio() {
                     <input value={object.classes} onChange={(event) => updateObject(index, "classes", event.target.value)} placeholder="detector_class" aria-label="Detector classes" />
                     <input value={object.colors_any} onChange={(event) => updateObject(index, "colors_any", event.target.value)} placeholder="colors, optional" aria-label="Object colors" />
                     <input value={object.states || ""} onChange={(event) => updateObject(index, "states", event.target.value)} placeholder="states, e.g. open, closed" aria-label="Object states" />
+                    <input value={object.prompts || ""} onChange={(event) => updateObject(index, "prompts", event.target.value)} placeholder="descriptions for no-training detection" aria-label="Object descriptions" />
                     <button className="remove-button" onClick={() => removeObject(index)} type="button">Remove</button>
                   </div>
                 ))}
@@ -879,6 +888,7 @@ function TrainingStudio() {
                         <option value="object_visible">Object visible</option>
                         <option value="hand_object_interaction">Hand-object action</option>
                         <option value="object_state">Object state</option>
+                        <option value="visual_question">Visual question (no training)</option>
                       </select>
                       <input value={step.object} onChange={(event) => updateStep(index, "object", event.target.value)} placeholder="object ID" aria-label="Evidence object" />
                       <input value={step.label} onChange={(event) => updateStep(index, "label", event.target.value)} placeholder="action label" aria-label="Evidence label" />
@@ -888,6 +898,15 @@ function TrainingStudio() {
                       <input value={step.inside_of} onChange={(event) => updateStep(index, "inside_of", event.target.value)} placeholder="inside of object ID, optional" aria-label="Evidence inside of" />
                       <span />
                     </div>
+                    {step.kind === "visual_question" && (
+                      <div className="builder-row">
+                        <input className="question-input" value={step.question} onChange={(event) => updateStep(index, "question", event.target.value)} placeholder="Ask positively, e.g. Is a tray pulled out of the freezer?" aria-label="Evidence question" />
+                        <select value={step.expect} onChange={(event) => updateStep(index, "expect", event.target.value)} aria-label="Answer that completes the step">
+                          <option value="yes">done when: yes</option>
+                          <option value="no">done when: no</option>
+                        </select>
+                      </div>
+                    )}
                     <div className="builder-row builder-row-small">
                       <input type="number" min="1" value={step.min_frames} onChange={(event) => updateStep(index, "min_frames", event.target.value)} placeholder="min frames" aria-label="Minimum frames" />
                       <input type="number" min="1" value={step.expected_duration_s} onChange={(event) => updateStep(index, "expected_duration_s", event.target.value)} placeholder="expected seconds" aria-label="Expected duration" />

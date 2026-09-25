@@ -67,13 +67,15 @@ annotation workflow, and record every new result in this document and docs/progr
 4. docs/architecture.md
 5. docs/validation_matrix.md
 6. docs/risk_register.md
-7. docs/training_studio_plan.md
-8. docs/progress_log.md
-9. bas_har/schema/plan_schema.py
-10. bas_har/procedure/engine.py
-11. bas_har/web/server.py
-12. web/src/App.jsx
-13. web/src/TrainingStudio.jsx
+7. docs/progress_log.md
+8. bas_har/schema/plan_schema.py
+9. bas_har/procedure/engine.py
+10. bas_har/web/server.py
+11. web/src/App.jsx
+12. web/src/TrainingStudio.jsx
+
+(`docs/training_studio_plan.md` was retired on 2026-09-16 — it was the original planning document
+and every item in it had already been implemented or superseded by the current docs above.)
 
 AGENTS.md is binding for coding style: Python 3.11–3.13 only, pathlib instead of os.path,
 type hints on public functions, loguru instead of logging.getLogger, specific exceptions,
@@ -623,3 +625,75 @@ just via a one-off script.
 **Test suite**: 193 passing (`pytest -q`), Ruff and formatting clean, React build clean, as of this
 section. New test files since Section 18: `tests/test_state_checker.py`,
 `tests/test_web_streaming.py`, `tests/test_frame_encoder.py`.
+
+## 20. Described-not-trained recognition — 2026-09-22 (supersedes Section 19 where they disagree)
+
+Read this with `HANDOVER.md` Section 19, `docs/progress_log.md` Checkpoint 33 and risk register
+rows 26-29. Nothing about trained activities changed; this is an additional mode.
+
+**New files**
+- `bas_har/perception/open_vocab.py` — `OpenVocabDetector`, same surface as `ObjectDetector`,
+  driven by text prompts instead of trained classes.
+- `bas_har/perception/vlm.py` — `build_prompt`, `parse_answers`, `FrameQuestioner` protocol,
+  `VisualQuestionAnswerer` (Qwen3-VL-2B), `AsyncVisualQuestioner` (background thread).
+- `activities/melfi_zeroshot/` — plan v0.3.0 + activity.yaml. No takes, no annotations, no model.
+- `tests/test_zero_shot.py` — 11 tests covering prompt mapping, the new rule kind, evidence with
+  `expect`, prompt/answer parsing, and the async questioner's non-blocking behaviour.
+
+**Changed files**: `bas_har/schema/plan_schema.py` (`prompts`, `visual_question`, `expect`,
+`prompt_classes()`, `visual_questions()`), `bas_har/perception/types.py` (`questions`),
+`bas_har/perception/pipeline.py` (prompt/questioner wiring), `bas_har/procedure/evidence.py`
+(`_eval_question`), `bas_har/procedure/engine.py` (`_change_key`),
+`bas_har/web/server.py` (zero-shot selection, questioner lifecycle, status fields),
+`web/src/App.jsx`, `web/src/TrainingStudio.jsx`, `web/src/styles.css`, `.gitignore`.
+
+**Rules for anyone editing a zero-shot plan**
+1. Every question is phrased positively. Use `expect: 'no'` for closed/removed/finished. A
+   question containing "not", "closed" or "empty" will score near zero — this is measured, not a
+   guess.
+2. Every closing step must also require a positive "is the equipment visible" question, or footage
+   with none of the equipment in it will complete it.
+3. Keep the question count small and shared across steps. All active questions go in one VLM call;
+   splitting them into several calls made answers go missing.
+4. After any plan change, check *when* steps completed against where the equipment actually
+   appears in the video. A clean "all steps completed" is the failure mode to distrust.
+
+**State of the unseen-video test**: 5 of 8 steps, correct times, no false completions, no alerts,
+1.0x real time. Do not describe this as full recognition of the procedure.
+
+**Environment note**: loading the YOLOE text encoder auto-installed `clip`, `ftfy`, `regex`,
+`tqdm`, `wcwidth` into `.venv`. Nothing depends on removing them; 204 tests pass with them present.
+
+## 21. Described mode, second pass — 2026-09-23 (supersedes Section 20 where they disagree)
+
+Read `HANDOVER.md` Section 20 and `docs/progress_log.md` Checkpoint 34 first. Two claims in
+Section 20 were wrong and are corrected there: the new video has two MELFI cycles, and the
+equipment-visible guard never worked.
+
+**Code facts that changed**
+- `bas_har/perception/vlm.py`: `ask()` returns yes-probabilities from one forward pass over a
+  pre-filled answer (`filled_answer`, `ANSWER_FILLS`). `parse_answers`, `set_questions` and answer
+  smoothing are gone (smoothing was measured and made things worse).
+- `bas_har/procedure/evidence.py`: `QUESTION_YES_MIN = 0.6`, `QUESTION_NO_MAX = 0.4`,
+  `question_verdict()`; `detections_needed()` (exported from `bas_har.procedure`).
+- `bas_har/perception/pipeline.py`: `run_detector=False` gives a pipeline with no detector.
+- `bas_har/web/server.py`: `_recognition_mode` -> `zero_shot` / `hybrid` / `trained`; status
+  `answers` is `{question: {"p": float, "verdict": "yes|no|unsure"}}`; `_active_questions` removed.
+- `web/src/TrainingStudio.jsx`: "done when: yes/no" picker; `expect` now survives load/save.
+
+**Rules (in addition to Section 20's)**
+1. Don't split a plan's questions across calls or narrow them per step: probabilities depend on
+   the whole question set.
+2. Before trusting a question, look at its probability timeline on a real video. A flat ~0.5 line
+   means the model can't see it; that step needs boxes.
+3. Judge step times against frame sheets at 0.5 s or finer. A 1 fps sheet hid a whole second cycle
+   in the new video.
+
+**Scratch tooling** (session scratchpad `…/b76c5e62-…/scratchpad/vqa/`, not in the repo):
+`score.py` (question AUC/accuracy on the 55 boxed Slawosz frames, several answer methods),
+`cache_answers.py` + `replay.py` (cache probabilities every 0.4 s, then replay the real engine
+with plan tweaks in seconds), `crop_test.py`, `contention.py`.
+
+**Blocked**: `pip install bitsandbytes` was refused by the permission system; ask the owner
+before trying 4-bit models again. Qwen3-VL-4B is cached in the Hugging Face cache (~9 GB); with
+CPU offload it was not a clear win (Checkpoint 34), so this is low priority.

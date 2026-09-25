@@ -1,0 +1,131 @@
+id: melfi_zeroshot
+name: MELFI Sample Stowage (described, not trained)
+version: 0.4.0
+author: local
+created: '2026-09-22'
+description: 'Every object below is described in plain text so an open-vocabulary detector can find it
+  without training, and every step is checked by asking a vision-language model a yes/no question about
+  the current frame. Only three questions are used, all phrased positively, because models answer "is
+  it open?" far more reliably than "is it closed?" - the closing steps expect the answer "no" to the same
+  question instead. Steps only ask about what the camera can actually see at that moment: the compartment
+  lid is hidden under the astronaut''s glove and the open door is hidden behind the pulled-out tray, so
+  those states are left to a trained detector rather than guessed. Nothing here is tied to one camera
+  angle or one recording.'
+camera:
+  source: 0
+  fps: 25
+  resolution:
+  - 768
+  - 432
+fiducial:
+  type: none
+objects:
+- id: astronaut
+  classes:
+  - astronaut
+  prompts:
+  - astronaut
+  - person
+- id: sample
+  classes:
+  - sample
+  prompts:
+  - small white plastic sample pouch
+  - plastic bag held in hand
+- id: melfi_freezer
+  classes:
+  - melfi_freezer
+  prompts:
+  - freezer rack with round doors
+  - laboratory freezer
+- id: dewar_hatch
+  classes:
+  - dewar_hatch
+  prompts:
+  - round freezer door
+  - circular hatch on a freezer
+- id: tray
+  classes:
+  - tray
+  prompts:
+  - long white cylindrical tray
+  - metal cylinder pulled out of a freezer
+- id: ice_vapor
+  classes:
+  - ice_vapor
+  prompts:
+  - cloud of white vapour
+  - frost cloud in the air
+steps:
+- id: step_01
+  description: The astronaut holds the sample pouch.
+  evidence:
+  - kind: visual_question
+    question: Is the astronaut holding a small plastic sample bag or pouch in their hands?
+    expect: 'yes'
+    min_frames: 10
+  next:
+  - step_02
+  timeout_s: 180
+  expected_duration_s: 11
+- id: step_02
+  description: A tray is pulled out of the freezer.
+  evidence:
+  - kind: visual_question
+    question: Is a long cylindrical tray pulled out of the freezer, or held in the astronaut's hands?
+    expect: 'yes'
+    min_frames: 10
+  next:
+  - step_03
+  timeout_s: 180
+  expected_duration_s: 6
+- id: step_03
+  description: The sample leaves the astronaut's hands while the tray is out.
+  evidence:
+  - kind: visual_question
+    question: Is the astronaut holding a small plastic sample bag or pouch in their hands?
+    expect: 'no'
+    min_frames: 10
+  - kind: visual_question
+    question: Is a long cylindrical tray pulled out of the freezer, or held in the astronaut's hands?
+    expect: 'yes'
+    min_frames: 10
+  next:
+  - step_04
+  timeout_s: 180
+  expected_duration_s: 12
+- id: step_04
+  description: The tray is pushed back in; the open door is visible.
+  evidence:
+  - kind: visual_question
+    question: Is a long cylindrical tray pulled out of the freezer, or held in the astronaut's hands?
+    expect: 'no'
+    min_frames: 10
+  - kind: visual_question
+    question: Is one of the round freezer doors open, so the inside of the freezer is visible?
+    expect: 'yes'
+    min_frames: 10
+  next:
+  - step_05
+  timeout_s: 180
+  expected_duration_s: 6
+- id: step_05
+  description: The freezer door is closed.
+  evidence:
+  - kind: visual_question
+    question: Is one of the round freezer doors open, so the inside of the freezer is visible?
+    expect: 'no'
+    min_frames: 10
+  - kind: visual_question
+    question: Is a long cylindrical tray pulled out of the freezer, or held in the astronaut's hands?
+    expect: 'no'
+    min_frames: 10
+  next: []
+  timeout_s: 180
+  expected_duration_s: 8
+alert_policy:
+  skip_confidence_threshold: 0.85
+  skip_persistence_frames: 5
+  rate_limit_s: 5.0
+  silence_window_s: 60.0
+  pause_tolerance_s: 90.0

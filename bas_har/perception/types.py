@@ -95,6 +95,7 @@ class PerceptionResult:
     pose: PoseKeypoints | None = None
     hands: list[HandKeypoints] = field(default_factory=list)
     hoi: list[HandObjectInteraction] = field(default_factory=list)
+    questions: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

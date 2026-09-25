@@ -42,7 +42,7 @@ from bas_har.procedure.smoothing import (
     StepSmoother,
 )
 from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
-from bas_har.schema.plan_schema import ExperimentPlan, StepSpec
+from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, StepSpec
 
 PAUSE_DURATION_MARGIN = 1.5
 SKIP_CONFIRM_S = 1.5
@@ -245,16 +245,27 @@ class ProcedureEngine:
         ]
 
     @staticmethod
-    def _state_change_pending(pending: list[StepSpec], candidate: StepSpec) -> bool:
-        wanted = {
-            (rule.object, rule.state) for rule in candidate.evidence if rule.kind == "object_state"
-        }
-        return any(
-            rule.kind == "object_state"
-            and any(obj == rule.object and state != rule.state for obj, state in wanted)
-            for step in pending
-            for rule in step.evidence
-        )
+    def _change_key(rule: EvidenceRule) -> tuple[tuple[str, str | None], str | None] | None:
+        """What a rule asserts about the world, so an earlier pending step can block a later one."""
+        if rule.kind == "object_state":
+            return ("state", rule.object), rule.state
+        if rule.kind == "visual_question":
+            return ("question", rule.question), rule.expect
+        return None
+
+    @classmethod
+    def _state_change_pending(cls, pending: list[StepSpec], candidate: StepSpec) -> bool:
+        wanted = {}
+        for rule in candidate.evidence:
+            key = cls._change_key(rule)
+            if key is not None:
+                wanted[key[0]] = key[1]
+        for step in pending:
+            for rule in step.evidence:
+                key = cls._change_key(rule)
+                if key is not None and key[0] in wanted and wanted[key[0]] != key[1]:
+                    return True
+        return False
 
     def _skipped_steps(self) -> list[StepSpec]:
         return [s for s in self.plan.steps if s.id in self._skipped]
