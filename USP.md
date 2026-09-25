@@ -125,7 +125,7 @@ immutable.
 
 ## 12. Engineered like flight software, not a hackathon demo
 
-- **213 automated tests**, enforced linting, schema-first design.
+- **215 automated tests**, enforced linting, schema-first design.
 - Strict schema validation of plans, labels, activity packages and display settings.
 - A living validation matrix, risk register and decision log.
 - Designed for the path from laptop to station: offline, deterministic, explainable, and

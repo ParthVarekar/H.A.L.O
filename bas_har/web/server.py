@@ -319,12 +319,12 @@ def _detection_dict(result: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _annotate_frame(frame: Any, result: Any) -> Any:
+def _annotate_frame(frame: Any, detections: list[Any]) -> Any:
     import cv2
     import numpy as np
 
     font = cv2.FONT_HERSHEY_SIMPLEX
-    for detection in result.detections:
+    for detection in detections:
         bbox = detection.bbox
         x1, y1, x2, y2 = int(bbox.x1), int(bbox.y1), int(bbox.x2), int(bbox.y2)
         cv2.rectangle(frame, (x1, y1), (x2, y2), BOX_COLOR_BGR, 1, cv2.LINE_AA)
@@ -348,8 +348,11 @@ def _annotate_frame(frame: Any, result: Any) -> Any:
     return frame
 
 
-def _render_frame(frame: Any, result: Any, show_boxes: bool) -> Any:
-    return _annotate_frame(frame.copy(), result) if show_boxes else frame
+def _render_frame(frame: Any, result: Any, display: DisplaySettings) -> Any:
+    if not display.show_boxes:
+        return frame
+    shown = [det for det in result.detections if det.conf >= display.min_confidence]
+    return _annotate_frame(frame.copy(), shown)
 
 
 def _encode_still(frame: Any) -> bytes | None:
@@ -410,6 +413,7 @@ class WebState:
             "questions_answered": 0,
             "answers": {},
             "show_boxes": True,
+            "min_box_confidence": 0.0,
             "video_time_s": 0.0,
         }
 
@@ -527,12 +531,13 @@ class WebState:
         with self.lock:
             self.display = display
             self.status["show_boxes"] = display.show_boxes
+            self.status["min_box_confidence"] = display.min_confidence
             last = self.last_render
             running = bool(self.status["running"])
         if last is None or running:
             return
         frame, result, frame_id = last
-        still = _encode_still(_render_frame(frame, result, display.show_boxes))
+        still = _encode_still(_render_frame(frame, result, display))
         if still is not None:
             self.set_frame(still, frame_id)
 
@@ -607,7 +612,7 @@ class SessionRunner:
             frame_id, frame, result = item
             began = time.perf_counter()
             self.state.remember_render(frame, result, frame_id)
-            annotated = _render_frame(frame, result, self.state.display.show_boxes)
+            annotated = _render_frame(frame, result, self.state.display)
             drawn = time.perf_counter()
             encoded = encoder.encode(annotated)
             encoded_at = time.perf_counter()
@@ -1314,7 +1319,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/activities":
                 self._create_activity(payload)
             elif parsed.path == "/api/display":
-                display = DisplaySettings.model_validate(payload)
+                display = DisplaySettings.model_validate(
+                    {**self.server.state.display.model_dump(), **payload}
+                )
                 self.server.state.set_display(display)
                 self._send_json(display.model_dump())
             elif parsed.path == "/api/start":

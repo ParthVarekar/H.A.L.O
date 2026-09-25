@@ -385,10 +385,10 @@ def test_display_toggle_redraws_the_still_frame_without_boxes() -> None:
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    def post_display(show_boxes: bool) -> dict:
+    def post_display(**settings: object) -> dict:
         request = Request(
             f"http://127.0.0.1:{server.server_port}/api/display",
-            data=json.dumps({"show_boxes": show_boxes}).encode("utf-8"),
+            data=json.dumps(settings).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -401,12 +401,17 @@ def test_display_toggle_redraws_the_still_frame_without_boxes() -> None:
         return float(cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR).mean())
 
     try:
-        assert post_display(False) == {"show_boxes": False}
+        assert post_display(show_boxes=False)["show_boxes"] is False
         assert state.snapshot()["show_boxes"] is False
         hidden = still_brightness()
-        assert post_display(True) == {"show_boxes": True}
+        assert post_display(show_boxes=True)["show_boxes"] is True
         shown = still_brightness()
         assert hidden < 1.0 < shown
+        assert post_display(min_confidence=0.95)["min_confidence"] == 0.95
+        filtered = still_brightness()
+        assert filtered < 1.0
+        assert post_display(show_boxes=True) == {"show_boxes": True, "min_confidence": 0.95}
+        assert state.snapshot()["min_box_confidence"] == 0.95
         assert frame.max() == 0
     finally:
         server.shutdown()
