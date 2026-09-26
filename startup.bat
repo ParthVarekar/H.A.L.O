@@ -6,6 +6,10 @@ set "PYTHON=%CD%\.venv\Scripts\python.exe"
 set "PLAN=%CD%\experiments\red_blue_box\experiment_plan.yaml"
 set "YOLO_MODEL=%BAS_HAR_MODEL%"
 if not defined YOLO_MODEL set "YOLO_MODEL=models\yolo11n.pt"
+set "HOST=%BAS_HAR_HOST%"
+if not defined HOST set "HOST=127.0.0.1"
+set "STREAM_ARGS="
+if defined BAS_HAR_STREAM_TO set "STREAM_ARGS=--stream-to %BAS_HAR_STREAM_TO%"
 set "WEB_INDEX=%CD%\web\dist\index.html"
 set "VIDEO=%USERPROFILE%\Downloads\on cell.mp4"
 if not exist "%VIDEO%" set "VIDEO="
@@ -19,6 +23,7 @@ if not exist "%PLAN%" goto missing_plan
 if exist "%~1" goto explicit_video
 
 if /I "%~1"=="test" goto test_only
+if /I "%~1"=="verify" goto verify_run
 if /I "%~1"=="prepare" goto prepare_training
 if /I "%~1"=="annotate" goto annotate_training
 if /I "%~1"=="train" goto train_training
@@ -40,6 +45,11 @@ if errorlevel 1 goto checks_failed
 echo.
 echo All BAS-HAR checks passed.
 exit /b 0
+
+:verify_run
+echo.
+"%PYTHON%" -m bas_har verify
+exit /b %ERRORLEVEL%
 
 :prepare_training
 set "TRAINING_SOURCE=%~2"
@@ -86,9 +96,9 @@ set "SOURCE=%~2"
 if not defined SOURCE set "SOURCE=0"
 echo.
 echo Starting BAS-HAR React dashboard on source %SOURCE%...
-start "BAS-HAR web" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --source "%SOURCE%" --yolo-model "%YOLO_MODEL%" --host 127.0.0.1 --port 5767 --open-browser
+start "BAS-HAR web" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --source "%SOURCE%" --yolo-model "%YOLO_MODEL%" --host %HOST% --port 5767 %STREAM_ARGS% --open-browser
 if errorlevel 1 exit /b %ERRORLEVEL%
-echo Dashboard: http://127.0.0.1:5767
+echo Dashboard: http://%HOST%:5767
 exit /b 0
 
 :video
@@ -111,9 +121,9 @@ if not defined VIDEO goto missing_video
 if not exist "%VIDEO%" goto missing_video
 echo.
 echo Starting BAS-HAR React dashboard with video: %VIDEO%
-start "BAS-HAR web" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --source "%VIDEO%" --yolo-model "%YOLO_MODEL%" --host 127.0.0.1 --port 5767 --open-browser
+start "BAS-HAR web" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --source "%VIDEO%" --yolo-model "%YOLO_MODEL%" --host %HOST% --port 5767 %STREAM_ARGS% --open-browser
 if errorlevel 1 exit /b %ERRORLEVEL%
-echo Dashboard: http://127.0.0.1:5767
+echo Dashboard: http://%HOST%:5767
 exit /b 0
 
 :checks
@@ -181,6 +191,7 @@ exit /b 1
 echo Usage:
 echo   startup.bat              Run checks and start the React dashboard with Downloads video.
 echo   startup.bat test         Run checks only.
+echo   startup.bat verify       Reproduce the ISS reference run and verify its signed log.
 echo   startup.bat prepare      Extract frames from datasets/red_blue_box/raw/videos.
 echo   startup.bat prepare DIR  Extract frames from a video or folder.
 echo   startup.bat annotate     Open the local YOLO drag-box labeler for train.
@@ -195,4 +206,7 @@ echo   startup.bat video-gui    Alias for web.
 echo   startup.bat live         Start the React dashboard with webcam 0.
 echo   startup.bat live 1       Start the React dashboard with webcam 1.
 echo   startup.bat live FILE    Start the React dashboard with an MP4 or RTSP source.
+echo.
+echo   set BAS_HAR_STREAM_TO=udp://192.168.1.20:5000   also stream the video to that computer (VLC: udp://@:5000)
+echo   set BAS_HAR_HOST=0.0.0.0                        let other computers on the network open the dashboard
 exit /b 0

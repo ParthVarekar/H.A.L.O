@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { SPEECH_LANGUAGES } from "./speech";
 
 const ICONS = {
   check: <polyline points="20 6 9 17 4 12" />,
@@ -90,6 +92,27 @@ const ICONS = {
     </>
   ),
   moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />,
+  shield: (
+    <>
+      <path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z" />
+      <polyline points="8.5 12 11 14.5 15.5 10" />
+    </>
+  ),
+  cast: (
+    <>
+      <path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+      <path d="M2 12a9 9 0 0 1 8 8" />
+      <path d="M2 16a5 5 0 0 1 4 4" />
+      <line x1="2" y1="20" x2="2.01" y2="20" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 16 }) {
@@ -228,6 +251,8 @@ export function SessionHeader({
   voiceOn,
   voiceHere,
   onToggleVoice,
+  voiceLang,
+  onVoiceLang,
 }) {
   return (
     <section className="ops-hero" aria-label="Session">
@@ -297,6 +322,20 @@ export function SessionHeader({
           {voiceOn && !voiceHere && <i className="ops-voice-away" aria-hidden="true" />}
           <span className="ops-sr">{voiceOn ? "Turn voice alerts off" : "Turn voice alerts on"}</span>
         </button>
+        <div className="ops-lang" role="group" aria-label="Announcement language">
+          {SPEECH_LANGUAGES.map(([id, short, full]) => (
+            <button
+              key={id}
+              type="button"
+              lang={id}
+              aria-pressed={voiceLang === id}
+              title={`Announce in ${full}`}
+              onClick={() => onVoiceLang(id)}
+            >
+              {short}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -374,7 +413,7 @@ export function Switch({ checked, onChange, label, disabled }) {
   );
 }
 
-export function VideoStage({ imageUrl, running, finished, busyText, onFile, onOpenLive, locked, now, showBoxes, onShowBoxes }) {
+export function VideoStage({ imageUrl, running, finished, busyText, onFile, onOpenLive, locked, now, showBoxes, onShowBoxes, streaming }) {
   let badge = null;
   if (running && imageUrl) badge = <span className="ops-stage-badge is-live"><i />Live analysis</span>;
   else if (finished && imageUrl) badge = <span className="ops-stage-badge">Session ended</span>;
@@ -412,12 +451,21 @@ export function VideoStage({ imageUrl, running, finished, busyText, onFile, onOp
             <>
               <span className="ops-now-label">{now.label}</span>
               <span className="ops-now-text">{now.text}</span>
+              {now.next && <span className="ops-now-next">Next: {now.next}</span>}
             </>
           ) : (
             <span className="ops-now-text is-muted">No active session</span>
           )}
         </div>
-        <Switch checked={showBoxes} onChange={onShowBoxes} label="Detection boxes" />
+        <div className="ops-stage-controls">
+          {streaming && (
+            <span className="ops-stream-pill" title={`Streaming to ${streaming}`}>
+              <i aria-hidden="true" />
+              {streaming}
+            </span>
+          )}
+          <Switch checked={showBoxes} onChange={onShowBoxes} label="Detection boxes" />
+        </div>
       </div>
     </section>
   );
@@ -569,6 +617,125 @@ export function ModelAnswers({ answers, answered, modeLabel }) {
         ))}
       </ul>
       <p className="ops-card-note">{modeLabel}. Answers between 40% and 60% count as unsure and complete nothing.</p>
+    </section>
+  );
+}
+
+function formatBytes(bytes) {
+  if (bytes == null) return "–";
+  if (bytes < 10_000) return `${bytes.toLocaleString()} bytes`;
+  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+
+export function EvidencePanel({ downlink }) {
+  if (!downlink || downlink.error) return null;
+  const verified = Boolean(downlink.verified);
+  const rows = [
+    ["Report size", formatBytes(downlink.bytes)],
+    ["Video size", formatBytes(downlink.source_bytes)],
+    ["Smaller than video", downlink.ratio ? `${downlink.ratio.toLocaleString()}×` : "–"],
+    ["Events signed", String(downlink.events)],
+    ["Station key", downlink.key_id],
+    ["Chain ends in", `${String(downlink.final_hash).slice(0, 16)}…`],
+  ];
+  return (
+    <section className="ops-card ops-evidence" aria-label="Signed session report">
+      <div className="ops-card-head">
+        <h2>Signed session report</h2>
+        <span className={`ops-status ${verified ? "is-ok" : "is-danger"}`}>
+          <Icon name="shield" size={12} />
+          {verified ? "Verified" : "Not verified"}
+        </span>
+      </div>
+      <dl className="ops-details-grid">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd className={label === "Station key" || label === "Chain ends in" ? "is-mono" : undefined}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="ops-evidence-actions">
+        <a className="ops-btn ops-btn--small" href="/api/downlink" download>
+          <Icon name="download" size={13} />
+          Report
+        </a>
+        <a className="ops-btn ops-btn--small ops-btn--ghost" href="/api/session-log" download>
+          <Icon name="download" size={13} />
+          Signed log
+        </a>
+      </div>
+      <p className="ops-card-note">
+        Every event is SHA-256 chained and Ed25519-signed. Anyone can check a copy with <code>python -m bas_har verify-log</code>.
+      </p>
+    </section>
+  );
+}
+
+export function StreamPanel({ stream, onApply, busy }) {
+  const [host, setHost] = useState(stream?.host || "");
+  const [port, setPort] = useState(String(stream?.port || 5000));
+  const enabled = Boolean(stream?.enabled);
+  useEffect(() => {
+    if (!stream) return;
+    setHost((current) => current || stream.host);
+    setPort((current) => current || String(stream.port));
+  }, [stream]);
+  if (!stream) return null;
+  const submit = (event) => {
+    event.preventDefault();
+    if (enabled) onApply({ enabled: false });
+    else onApply({ enabled: true, host: host.trim(), port: Number(port) });
+  };
+  return (
+    <section className="ops-card ops-stream" aria-label="Stream to another computer">
+      <div className="ops-card-head">
+        <h2>Stream to IP</h2>
+        {enabled && (
+          <span className="ops-status is-live">
+            <i aria-hidden="true" />
+            Streaming
+          </span>
+        )}
+      </div>
+      <form className="ops-stream-form" onSubmit={submit}>
+        <label className="ops-live-field">
+          <span>IP address</span>
+          <input
+            className="ops-input"
+            value={host}
+            onChange={(event) => setHost(event.target.value)}
+            placeholder="192.168.1.20"
+            spellCheck="false"
+            disabled={enabled}
+          />
+        </label>
+        <label className="ops-live-field ops-stream-port">
+          <span>Port</span>
+          <input
+            className="ops-input"
+            value={port}
+            onChange={(event) => setPort(event.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            disabled={enabled}
+          />
+        </label>
+        <button
+          className={`ops-btn ${enabled ? "ops-btn--danger" : "ops-btn--primary"}`}
+          type="submit"
+          disabled={busy || (!enabled && (!host.trim() || !port))}
+        >
+          <Icon name={enabled ? "stop" : "cast"} size={13} />
+          {enabled ? "Stop" : "Start"}
+        </button>
+      </form>
+      <p className="ops-card-note">
+        {enabled
+          ? `Sending to ${stream.target} · ${stream.frames_sent.toLocaleString()} frames${stream.codec ? ` · ${stream.codec}` : ""}. On that computer, open ${stream.player_url} in VLC.`
+          : "Sends the annotated video live as MPEG-TS over UDP. The rolling recording on this computer continues."}
+      </p>
+      {stream.error && <p className="ops-card-note is-danger">{stream.error}</p>}
     </section>
   );
 }

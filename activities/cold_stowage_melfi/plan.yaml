@@ -1,5 +1,8 @@
 id: cold_stowage_melfi
 name: MELFI Sample Stowage (Ignis)
+spoken_name:
+  en: "MELFI sample stowage"
+  hi: "MELFI सैंपल भंडारण"
 version: 1.1.0
 author: local
 created: '2026-09-14'
@@ -108,6 +111,9 @@ region_geometries: {}
 steps:
 - id: step_01
   description: Slawosz holds the sample pouch in front of MELFI.
+  instruction:
+    en: "Hold the sample pouch in front of MELFI."
+    hi: "सैंपल पाउच को MELFI के सामने पकड़ें।"
   evidence:
   - kind: object_visible
     object: sample
@@ -118,6 +124,9 @@ steps:
   expected_duration_s: 11
 - id: step_02
   description: Slawosz opens the dewar 1 hatch (latch twisted to the right).
+  instruction:
+    en: "Open the dewar 1 hatch by twisting the latch to the right."
+    hi: "लैच को दाईं ओर घुमाकर ड्यूअर 1 का हैच खोलें।"
   evidence:
   - kind: object_state
     object: dewar_hatch
@@ -129,6 +138,9 @@ steps:
   expected_duration_s: 2
 - id: step_03
   description: Slawosz pulls tray 2 out of dewar 1.
+  instruction:
+    en: "Pull tray 2 out of dewar 1."
+    hi: "ड्यूअर 1 से ट्रे 2 बाहर निकालें।"
   evidence:
   - kind: object_state
     object: tray_2
@@ -140,6 +152,9 @@ steps:
   expected_duration_s: 2
 - id: step_04
   description: Slawosz opens compartment 1 with its knob.
+  instruction:
+    en: "Open compartment 1 with its knob."
+    hi: "नॉब से कम्पार्टमेंट 1 खोलें।"
   evidence:
   - kind: object_state
     object: compartment_1
@@ -151,6 +166,9 @@ steps:
   expected_duration_s: 6
 - id: step_05
   description: Slawosz places the sample inside the open compartment 1.
+  instruction:
+    en: "Place the sample inside compartment 1."
+    hi: "सैंपल को कम्पार्टमेंट 1 के अंदर रखें।"
   evidence:
   - kind: object_visible
     object: sample
@@ -166,6 +184,9 @@ steps:
   expected_duration_s: 5
 - id: step_06
   description: Slawosz closes compartment 1.
+  instruction:
+    en: "Close compartment 1."
+    hi: "कम्पार्टमेंट 1 बंद करें।"
   evidence:
   - kind: object_state
     object: compartment_1
@@ -177,6 +198,9 @@ steps:
   expected_duration_s: 2
 - id: step_07
   description: Slawosz slides tray 2 back into dewar 1.
+  instruction:
+    en: "Slide tray 2 back into dewar 1."
+    hi: "ट्रे 2 को वापस ड्यूअर 1 में सरकाएँ।"
   evidence:
   - kind: object_state
     object: tray_2
@@ -188,6 +212,9 @@ steps:
   expected_duration_s: 8
 - id: step_08
   description: Slawosz closes the dewar 1 hatch and twists the latch back to the left.
+  instruction:
+    en: "Close the dewar 1 hatch and twist the latch back to the left."
+    hi: "ड्यूअर 1 का हैच बंद करें और लैच को वापस बाईं ओर घुमाएँ।"
   evidence:
   - kind: object_state
     object: dewar_hatch

@@ -21,7 +21,7 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter, ValidationError
 
-from bas_har.config import logs_dir, project_root
+from bas_har.config import keys_dir, logs_dir, project_root
 from bas_har.procedure import (
     ColorSequenceTracker,
     ProcedureEngine,
@@ -44,6 +44,7 @@ from bas_har.schema.display_schema import DisplaySettings
 from bas_har.schema.event_schema import EventRecord
 from bas_har.schema.plan_schema import ExperimentPlan
 from bas_har.schema.recognition_schema import ActivityRecognition
+from bas_har.schema.stream_schema import StreamOutputSettings
 from bas_har.studio.annotations import (
     delete_annotation,
     list_annotations,
@@ -280,11 +281,19 @@ def _plan_summary(plan: ExperimentPlan) -> dict[str, Any]:
                 "id": step.id,
                 "description": step.description,
                 "expected_duration_s": step.expected_duration_s,
+                "timeout_s": step.timeout_s,
+                "instruction": {str(lang): text for lang, text in step.instruction.items()},
                 "evidence": [rule.kind for rule in step.evidence],
             }
             for step in plan.steps
         ],
+        "spoken_name": {str(lang): text for lang, text in plan.spoken_name.items()},
     }
+
+
+def uses_default_classes_only(plan: ExperimentPlan) -> bool:
+    """Whether every class the plan relies on is a stock detector class, so the rest can be ignored."""
+    return set(plan.detector_classes()) <= set(DEFAULT_TARGET_CLASSES)
 
 
 def _plan_color_names(plan: ExperimentPlan) -> list[str]:
@@ -373,6 +382,8 @@ class WebState:
         self.frame_jpeg: bytes | None = None
         self.last_render: tuple[Any, Any, int] | None = None
         self.display = DisplaySettings()
+        self.stream_out = StreamOutputSettings()
+        self.publisher: Any | None = None
         self.events: list[dict[str, Any]] = []
         self.status: dict[str, Any] = {
             "running": False,
@@ -415,11 +426,55 @@ class WebState:
             "show_boxes": True,
             "min_box_confidence": 0.0,
             "video_time_s": 0.0,
+            "downlink": None,
         }
 
     def snapshot(self) -> dict[str, Any]:
+        stream_out = self.stream_out_status()
         with self.lock:
-            return {**self.status, "events": list(self.events)}
+            return {**self.status, "events": list(self.events), "stream_out": stream_out}
+
+    def stream_out_status(self) -> dict[str, Any]:
+        with self.lock:
+            settings = self.stream_out
+            publisher = self.publisher
+        if publisher is not None:
+            return {**settings.model_dump(mode="json"), **publisher.status().model_dump()}
+        return {
+            **settings.model_dump(mode="json"),
+            "target": settings.target,
+            "player_url": settings.player_url,
+            "frames_sent": 0,
+            "codec": None,
+            "error": None,
+        }
+
+    def set_stream_out(self, settings: StreamOutputSettings) -> None:
+        """Stop any running stream and start a new one to the configured address when enabled."""
+        from bas_har.io.stream_out import UdpStreamPublisher
+
+        with self.lock:
+            previous = self.publisher
+            self.publisher = None
+            self.stream_out = settings
+        if previous is not None:
+            previous.close()
+        if settings.enabled:
+            publisher = UdpStreamPublisher(settings)
+            with self.lock:
+                self.publisher = publisher
+
+    def offer_stream(self, frame: Any) -> None:
+        publisher = self.publisher
+        if publisher is not None:
+            publisher.offer(frame)
+
+    def close_stream(self) -> None:
+        with self.lock:
+            publisher = self.publisher
+            self.publisher = None
+        if publisher is not None:
+            publisher.close()
 
     def update(self, **values: Any) -> None:
         with self.lock:
@@ -456,6 +511,7 @@ class WebState:
                 started_at=None,
                 summary=None,
                 video_time_s=0.0,
+                downlink=None,
             )
 
     def append_event(self, event: EventRecord) -> None:
@@ -508,6 +564,7 @@ class WebState:
                 started_at=None,
                 summary=None,
                 analysis=None,
+                downlink=None,
                 plan_revision=int(self.status.get("plan_revision", 0)) + 1,
             )
 
@@ -613,6 +670,7 @@ class SessionRunner:
             began = time.perf_counter()
             self.state.remember_render(frame, result, frame_id)
             annotated = _render_frame(frame, result, self.state.display)
+            self.state.offer_stream(annotated)
             drawn = time.perf_counter()
             encoded = encoder.encode(annotated)
             encoded_at = time.perf_counter()
@@ -660,6 +718,41 @@ class SessionRunner:
             with contextlib.suppress(queue.Full):
                 frames.put_nowait(frame)
 
+    def _source_bytes(self, buffer_dir: Path | None) -> int | None:
+        if _is_file_source(self.source):
+            with contextlib.suppress(OSError):
+                return Path(str(self.source)).stat().st_size
+        if self.record_buffer and buffer_dir is not None and buffer_dir.is_dir():
+            return sum(path.stat().st_size for path in buffer_dir.glob("*.mp4")) or None
+        return None
+
+    def _write_downlink(self, sink: Any, buffer_dir: Path | None) -> None:
+        """Seal the session in a signed, kilobyte-scale report and check it against the log."""
+        from bas_har.io.signed_log import build_downlink, verify_downlink, write_downlink
+
+        try:
+            source_bytes = self._source_bytes(buffer_dir)
+            report = build_downlink(sink, sink.key, source_bytes=source_bytes)
+            path = sink.path.with_suffix(".downlink.json")
+            size = write_downlink(report, path)
+            check = verify_downlink(path, sink.key.public_bytes, sink.path)
+        except (OSError, ValueError) as exc:
+            self.state.update(downlink={"error": str(exc)})
+            return
+        self.state.update(
+            downlink={
+                "path": str(path),
+                "log_path": str(sink.path),
+                "bytes": size,
+                "source_bytes": source_bytes,
+                "ratio": round(source_bytes / size) if source_bytes else None,
+                "events": report.event_count,
+                "key_id": report.key_id,
+                "final_hash": report.log_final_hash,
+                "verified": check.ok,
+            }
+        )
+
     def _build_questioner(self, questions: list[str]) -> Any | None:
         if not questions:
             return None
@@ -673,11 +766,13 @@ class SessionRunner:
         return AsyncVisualQuestioner(answerer, questions)
 
     def _run(self) -> None:
-        from bas_har.io import CrcJsonlEventSink, VideoCaptureSource
+        from bas_har.io import VideoCaptureSource
+        from bas_har.io.signed_log import SignedJsonlEventSink, load_or_create_station_key
         from bas_har.perception import PerceptionPipeline
 
         capture: Any | None = None
         sink: Any | None = None
+        buffer_dir: Path | None = None
         confirmation: ConfirmationSound | None = None
         sequence: ColorSequenceTracker | None = None
         slot = LatestSlot()
@@ -696,11 +791,13 @@ class SessionRunner:
             )
             capture.open()
             fps = capture.fps or self.state.plan.camera.fps
-            log_path = logs_dir() / f"web_{self.state.plan.experiment_id}_{int(time.time())}.jsonl"
-            sink = CrcJsonlEventSink(log_path)
+            stamp = time.strftime("%Y%m%d_%H%M%S", time.gmtime()) + f"_{uuid4().hex[:6]}"
+            log_path = logs_dir() / f"web_{self.state.plan.experiment_id}_{stamp}.jsonl"
+            station_key = load_or_create_station_key(keys_dir())
+            sink = SignedJsonlEventSink(log_path, station_key, self.state.plan)
             perf_handle = log_path.with_suffix(".perf.jsonl").open("a", encoding="utf-8")
             confirmation = ConfirmationSound()
-            buffer_dir = logs_dir() / "buffer" / self.state.plan.experiment_id
+            buffer_dir = logs_dir() / "buffer" / self.state.plan.experiment_id / stamp
             try:
                 sequence = ColorSequenceTracker(self.state.plan)
             except ValueError:
@@ -915,6 +1012,7 @@ class SessionRunner:
                     self.engine.close()
             if sink is not None:
                 sink.close()
+                self._write_downlink(sink, buffer_dir)
             if perf_handle is not None:
                 perf_handle.close()
             if confirmation is not None:
@@ -965,6 +1063,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/status":
             self._send_json(self.server.state.snapshot())
+            return
+        if parsed.path == "/api/stream-out":
+            self._send_json(self.server.state.stream_out_status())
+            return
+        if parsed.path in {"/api/downlink", "/api/session-log"}:
+            self._send_session_file("path" if parsed.path == "/api/downlink" else "log_path")
             return
         if parsed.path == "/api/plan":
             self._send_json(self.server.state.plan_data)
@@ -1311,6 +1415,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "/api/stop",
             "/api/silence",
             "/api/display",
+            "/api/stream-out",
         }:
             self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
             return
@@ -1324,6 +1429,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 )
                 self.server.state.set_display(display)
                 self._send_json(display.model_dump())
+            elif parsed.path == "/api/stream-out":
+                settings = StreamOutputSettings.model_validate(
+                    {**self.server.state.stream_out.model_dump(mode="json"), **payload}
+                )
+                self.server.state.set_stream_out(settings)
+                self._send_json(self.server.state.stream_out_status())
             elif parsed.path == "/api/start":
                 self._start(payload)
             elif parsed.path == "/api/stop":
@@ -1773,6 +1884,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             raise ValueError("request body must be a JSON object")
         return value
 
+    def _send_session_file(self, key: str) -> None:
+        downlink = self.server.state.snapshot().get("downlink") or {}
+        location = downlink.get(key)
+        if not location or not Path(location).is_file():
+            self._send_json({"error": "no finished session"}, HTTPStatus.NOT_FOUND)
+            return
+        path = Path(location)
+        self._send_bytes(path.read_bytes(), "application/json", download_name=path.name)
+
     def _send_frame(self) -> None:
         frame, _frame_id = self.server.state.frame_snapshot()
         if frame is None:
@@ -1894,6 +2014,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-frames", type=int, default=None)
     parser.add_argument("--no-start", action="store_true")
     parser.add_argument("--open-browser", action="store_true")
+    parser.add_argument(
+        "--stream-to",
+        default=None,
+        help="Also stream the monitored video to udp://<ip>:<port> (open it in VLC).",
+    )
     args = parser.parse_args(argv)
 
     if not STATIC_DIR.joinpath("index.html").is_file():
@@ -1909,7 +2034,10 @@ def main(argv: list[str] | None = None) -> int:
             threading.Timer(0.2, webbrowser.open, args=(f"http://{args.host}:{args.port}",)).start()
         return 0
     state = WebState(plan)
+    if args.stream_to:
+        state.set_stream_out(StreamOutputSettings.from_url(args.stream_to))
     server = DashboardServer((args.host, args.port), state, args.yolo_model, args.device)
+    server.filter_default_classes = uses_default_classes_only(plan)
     if not args.no_start:
         state.prepare_for_capture(source)
         runner = SessionRunner(
@@ -1918,6 +2046,7 @@ def main(argv: list[str] | None = None) -> int:
             yolo_model=args.yolo_model,
             max_frames=args.max_frames,
             device=args.device,
+            filter_default_classes=server.filter_default_classes,
         )
         state.set_runner(runner)
         runner.start()
@@ -1932,6 +2061,7 @@ def main(argv: list[str] | None = None) -> int:
         runner = state.get_runner()
         if runner is not None:
             runner.stop()
+        state.close_stream()
         server.server_close()
     return 0
 

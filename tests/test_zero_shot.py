@@ -14,6 +14,7 @@ from bas_har.perception.vlm import (
     AsyncVisualQuestioner,
     build_prompt,
     filled_answer,
+    load_cached_first,
 )
 from bas_har.procedure.evidence import EvidenceAccumulator, question_verdict
 from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
@@ -255,3 +256,27 @@ def test_pipeline_without_a_detector_still_asks_questions() -> None:
     result = pipeline.process(np.zeros((8, 8, 3), dtype=np.uint8), frame_id=0, ts_ms=0)
     assert pipeline.device == "cpu"
     assert result.detections == [] and result.questions == {QUESTION: 0.9}
+
+
+def test_model_loads_from_cache_without_network() -> None:
+    calls: list[dict] = []
+
+    def loader(model_id: str, **kwargs: object) -> str:
+        calls.append(kwargs)
+        return model_id
+
+    assert load_cached_first(loader, "org/model", dtype="bf16") == "org/model"
+    assert calls == [{"local_files_only": True, "dtype": "bf16"}]
+
+
+def test_model_downloads_only_when_not_cached() -> None:
+    calls: list[dict] = []
+
+    def loader(model_id: str, **kwargs: object) -> str:
+        calls.append(kwargs)
+        if kwargs.get("local_files_only"):
+            raise OSError("not cached")
+        return model_id
+
+    assert load_cached_first(loader, "org/model") == "org/model"
+    assert calls == [{"local_files_only": True}, {}]

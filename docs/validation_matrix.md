@@ -161,3 +161,18 @@ frames, which the VLM has never seen.
 | Qwen3-VL-4B vs 2B | better end to end | better per frame on Slawosz (door AUC 0.96 vs 0.86) but worse on the new video's fisheye view (misses the tray) | not adopted |
 | Deployed v0.4.0 on Slawosz (unseen by the VLM) | steps within 2.5 s | 2/5; every miss early (2.7-5.7 s), none random | partial |
 | Deployed v0.4.0 on the new video (replay) | steps within 2.5 s | 4/4 checkable steps | pass |
+
+## Requirement closure: stream to IP, next-step voice, signed record (2026-09-26)
+
+| Check | Target | Evidence | Status |
+|---|---|---|---|
+| One-command reproduction | ISS take end to end from a clean checkout | `python -m bas_har verify`: 8/8 steps in order, 0 alerts, 37 s on cuda:0 | pass |
+| Skipped step on real footage | the same take with step 1 cut out raises a skip | `verification/step1_removed.mp4`: SKIP_DETECTED at 1.48 s, OUT_OF_ORDER at 3.0 s; same in the real-time dashboard | pass |
+| Signed, hash-chained log | edits, deletions, reordering, forged signatures and other keys detected | `tests/test_signed_log.py`; one edited field in a real log reported at its line | pass |
+| Downlink report | signed, kilobyte-scale, seals the log | MELFI: 1,002 bytes, 9,701x smaller than the 9.7 MB video; a truncated log fails the seal | pass |
+| Stream to a specific IP | playable stream on another process | 508 H.264 frames decoded from `udp://127.0.0.1:5000` during a dashboard run (h264_nvenc); mpeg2video and libx264 fallbacks tested | pass |
+| Next step spoken | at the start and after every step | MELFI dashboard run: "Monitoring MELFI sample stowage. First: ..." then "Step N done. Next: ..." for steps 1-7, "Step 8 done. Procedure complete." | pass |
+| Step overdue alert | a step current longer than its `timeout_s` alerts once | `test_step_overdue_fires_once_after_timeout`; MELFI 60 s timeouts raise nothing on the 67 s take | pass |
+| Hindi announcements | every phrase has a Hindi form; falls back to English without a Hindi voice | phrases checked in Node; dashboard shows the missing-voice notice on this machine (no Hindi voice installed) | pass (voice untested) |
+| Offline model load | vision-language model never waits on the network when cached | `test_model_loads_from_cache_without_network` | pass |
+| Live source with a custom detector | trained classes are not filtered out | MELFI started from the launch config: was stuck on step 1 (stock-class filter); after `uses_default_classes_only`, 8/8 | pass (fixed) |

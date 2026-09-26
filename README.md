@@ -8,8 +8,9 @@
   <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-2f7bff?style=flat-square&labelColor=eef1f5&logo=python&logoColor=2f7bff">
   <img alt="PyTorch with CUDA" src="https://img.shields.io/badge/pytorch-CUDA-2f7bff?style=flat-square&labelColor=eef1f5&logo=pytorch&logoColor=2f7bff">
   <img alt="React 18" src="https://img.shields.io/badge/react-18-2f7bff?style=flat-square&labelColor=eef1f5&logo=react&logoColor=2f7bff">
-  <img alt="215 tests passing" src="https://img.shields.io/badge/tests-215%20passing-12a26a?style=flat-square&labelColor=eef1f5">
+  <img alt="276 tests passing" src="https://img.shields.io/badge/tests-276%20passing-12a26a?style=flat-square&labelColor=eef1f5">
   <img alt="Runs fully offline" src="https://img.shields.io/badge/runs-fully%20offline-12a26a?style=flat-square&labelColor=eef1f5">
+  <img alt="SIH26174 requirements: 7 of 7" src="https://img.shields.io/badge/SIH26174-7%20of%207%20requirements-12a26a?style=flat-square&labelColor=eef1f5">
 </p>
 
 <p align="center">
@@ -21,8 +22,19 @@
 <p align="center">
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="#how-it-works"><b>How it works</b></a> ·
+  <a href="#verify-it-yourself"><b>Verify it yourself</b></a> ·
   <a href="USP.md"><b>Why BAS-HAR</b></a> ·
-  <a href="docs/assets/demo.mp4"><b>Watch the demo</b></a>
+  <a href="docs/assets/demo.mp4"><b>Watch the demo</b></a> ·
+  <a href="docs/assets/intro.mp4"><b>Watch the intro</b></a>
+</p>
+
+<br>
+
+<p align="center">
+  <a href="docs/assets/intro.mp4"><img alt="BAS-HAR intro: what it does, in under a minute" src="docs/assets/intro.webp" width="100%"></a>
+</p>
+<p align="center">
+  <sub>BAS-HAR in under a minute. <a href="docs/assets/intro.mp4">Watch with sound</a>.</sub>
 </p>
 
 <br>
@@ -38,11 +50,13 @@
 <summary><b>Table of contents</b></summary>
 
 - [Why it matters](#why-it-matters)
+- [Every requirement, met](#every-requirement-met)
 - [Features](#features)
 - [Gallery](#gallery)
 - [Three ways to teach it](#three-ways-to-teach-it)
 - [How it works](#how-it-works)
 - [Quick start](#quick-start)
+- [Verify it yourself](#verify-it-yourself)
 - [Performance](#performance)
 - [FAQ](#faq)
 - [Documentation](#documentation)
@@ -58,6 +72,20 @@ out of a −80 °C freezer, can cost a sample that took months to prepare. Crews
 ground teams cannot watch every minute. **BAS-HAR** watches the procedure for them, checks every
 step against the plan and alerts the crew immediately, all on the station's own hardware.
 
+## Every requirement, met
+
+| SIH26174 asks for | BAS-HAR delivers |
+|---|---|
+| Continuous local video processing that tracks the sequence | Live camera, RTSP or video file, 1.00× real time at 25 fps on a laptop GPU |
+| The next step suggested at the start and after each step | Spoken and on screen: *"Step 2 done. Next: pull tray 2 out of dewar 1."* |
+| Voice alerts for skipped or out-of-sequence steps | Alerts jump the speech queue, with a tone, in English or Hindi |
+| A timestamped, structured, lightweight record | A signed, hash-chained JSONL log plus a signed ~1 KB downlink report |
+| Video streamed to a specific IP and stored locally | H.264 over UDP to any IP address, plus a rolling local recording |
+| A graphical monitoring interface | The dashboard shown above, in light and dark themes |
+| A trained AI model on an offline, standalone system | YOLO11 trained on real ISS footage (held-out mAP50 0.79), all local |
+
+Each row is traced to code, tests and a demo moment in [docs/SIH_REQUIREMENTS.md](docs/SIH_REQUIREMENTS.md).
+
 ## Features
 
 <p align="center">
@@ -72,6 +100,10 @@ step against the plan and alerts the crew immediately, all on the station's own 
   stalled steps, so every alert traces back to a rule you can read.
 - **Recognises the experiment by itself.** Drop in a video and BAS-HAR matches its scenes against
   every procedure in the library.
+- **Streams to the ground.** Send the annotated video to any IP address and open it in VLC, while
+  the station keeps its own rolling recording.
+- **A record nobody can quietly edit.** Every event is SHA-256 chained and Ed25519-signed. The whole
+  session is sealed in a signed report of about a kilobyte, nearly 10,000× smaller than the video.
 
 <p align="right"><a href="#top">Back to top ↑</a></p>
 
@@ -108,7 +140,7 @@ question about the camera frame:
       expect: "yes"
 ```
 
-A Qwen3-VL model running locally reads the whole question set in one pass, in about 0.4 seconds,
+A Qwen3-VL model running locally reads the whole question set in one pass, in about 0.6 seconds,
 and returns a calibrated probability for each answer. Anything between 40% and 60% counts as
 *unsure* and never ticks a box by itself.
 
@@ -129,8 +161,9 @@ YOLO11 detector, or combine both in one **hybrid** plan.
    from descriptions, answers to plain-English questions, and pose and hands when a plan needs them.
 2. **The procedure engine** checks that evidence against the plan. A step completes when its
    evidence holds across a short sliding window, so a single bad frame never raises a false alarm.
-3. **Output** is immediate: a live dashboard, spoken announcements, a checksummed event log and,
-   for live cameras, a rolling recording.
+3. **Output** is immediate: a live dashboard, spoken announcements with the next step, a signed
+   event log with a kilobyte-scale downlink report, a live stream to any IP address and, for live
+   cameras, a rolling recording.
 
 ## Quick start
 
@@ -144,10 +177,40 @@ cd web && npm install && npm run build && cd ..
 startup.bat                     # Operations dashboard at http://127.0.0.1:5767
 startup_training_studio.bat     # Training Studio
 cmd /c startup.bat test         # tests, lint and build
+startup.bat verify              # reproduce the ISS result and check its signatures
 ```
 
 Drop an experiment video onto the page, or connect a camera or RTSP stream. Windows 10/11 with an
 NVIDIA GPU is recommended; it also runs on CPU.
+
+To stream to another computer, enter its IP address in the dashboard's **Stream to IP** card (or
+`set BAS_HAR_STREAM_TO=udp://192.168.1.20:5000` before `startup.bat`), then open `udp://@:5000` in
+VLC on that computer.
+
+## Verify it yourself
+
+The ISS footage, its labels and the trained detector ship with this repository, so the headline
+result can be reproduced with one command and no network:
+
+```bash
+python -m bas_har verify
+```
+
+```text
+  PASS  Experiment plans validate      6 of 6
+  PASS  Reference take runs            cuda:0 · 37.3 s
+  PASS  Every step recognised          8 of 8
+  PASS  Steps in the planned order     no skips, none late
+  PASS  No false alerts                0 alerts
+  PASS  Signed event log verifies      42 lines · Ed25519 · key 443ab90de63c4fec
+  PASS  Downlink report seals the log  1,002 bytes · 9,701x smaller than the video
+  PASS  Removed step is caught         skip alert 1.48 s into the clip with step 1 cut out
+
+  ALL CHECKS PASSED (8/8)
+```
+
+`python -m bas_har verify-log` checks any saved session line by line. Change one character and it
+reports the exact line. See [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 <p align="right"><a href="#top">Back to top ↑</a></p>
 
@@ -159,8 +222,10 @@ NVIDIA GPU is recommended; it also runs on CPU.
 |---|---|
 | Playback | **1.00×** real time at **25 fps** |
 | Trained detection | **~10 ms** per frame |
-| Vision-language answers | full question set in **~0.4 s**, off the video path |
+| Vision-language answers | nine questions in **~0.6 s**, off the video path |
 | MELFI procedure | **8 / 8** steps, in order, **0** false alerts |
+| Skipped step | caught **1.5 s** into the clip |
+| Downlink report | **1 KB**, **9,700×** smaller than the video |
 
 ## FAQ
 
@@ -192,6 +257,20 @@ written to the event log with the time it happened.
 </details>
 
 <details>
+<summary><b>Can I check the results myself?</b></summary>
+<br>
+Yes. Run <code>python -m bas_har verify</code>. It replays the ISS footage that ships with the
+repository, checks every step and alert, and verifies the signatures on the record it writes.
+</details>
+
+<details>
+<summary><b>Can the ground see the video?</b></summary>
+<br>
+Yes. The dashboard streams the annotated video as H.264 over UDP to any IP address you enter. It
+plays in VLC, and the station keeps its own rolling recording at the same time.
+</details>
+
+<details>
 <summary><b>Can it watch a live camera?</b></summary>
 <br>
 Yes. Connect a webcam or an RTSP stream from the dashboard. Live sessions also keep a rolling
@@ -202,6 +281,8 @@ recording, so every alert can be reviewed afterwards.
 
 | Document | What it covers |
 |---|---|
+| [docs/SIH_REQUIREMENTS.md](docs/SIH_REQUIREMENTS.md) | Each SIH26174 requirement traced to code, tests and a demo moment |
+| [docs/VERIFICATION.md](docs/VERIFICATION.md) | Three commands to reproduce and check the results |
 | [USP.md](USP.md) | What makes BAS-HAR different |
 | [BOXING_GUIDE.md](BOXING_GUIDE.md) | Labelling video, written for non-programmers |
 | [training_guide.md](training_guide.md) | The Training Studio, end to end |

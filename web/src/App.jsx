@@ -5,17 +5,20 @@ import {
   Callout,
   DetailsPanel,
   DropOverlay,
+  EvidencePanel,
   LiveSourceRow,
   MetricStrip,
   ModelAnswers,
   ProcedurePanel,
   SessionHeader,
   SessionLog,
+  StreamPanel,
   VideoStage,
   formatVideoTime,
 } from "./Operations";
+import { alertText, nextStepAfter, phrases, spokenName, startText, stepCompletedText, summaryText } from "./speech";
 import TrainingStudio from "./TrainingStudio";
-import { Announcer, ownsVoice, startVoiceOwnership } from "./voice";
+import { Announcer, ownsVoice, startVoiceOwnership, watchVoices } from "./voice";
 
 const RECOGNITION_MODES = {
   zero_shot: "Described mode",
@@ -48,6 +51,8 @@ const EMPTY_STATUS = {
   answers: {},
   show_boxes: true,
   video_time_s: 0,
+  stream_out: null,
+  downlink: null,
 };
 
 const SESSION_LOG_LIMIT = 500;
@@ -55,6 +60,15 @@ const LOG_DISPLAY_LIMIT = 200;
 const UPLOAD_PATH = /[\\/]logs[\\/]uploads[\\/]/;
 const BOXES_PREFERENCE_KEY = "bas-har-show-boxes";
 const THEME_KEY = "bas-har-theme";
+const VOICE_LANGUAGE_KEY = "bas-har-voice-lang";
+
+function readVoiceLanguage() {
+  try {
+    return window.localStorage.getItem(VOICE_LANGUAGE_KEY) === "hi" ? "hi" : "en";
+  } catch {
+    return "en";
+  }
+}
 
 function readTheme() {
   const requested = new URLSearchParams(window.location.search).get("theme");
@@ -113,6 +127,17 @@ function writeBoxesPreference(showBoxes) {
 
 function capitalise(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+function shortenStep(description) {
+  return (description || "")
+    .replace(/[.\s]+$/, "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/^slawosz\s+/i, "")
+    .split(SPEECH_CLAUSE_BREAK)[0]
+    .split(/\s+/)
+    .slice(0, SPEECH_LABEL_WORDS)
+    .join(" ");
 }
 
 let audioContext = null;
@@ -179,6 +204,19 @@ function App() {
   const [showBoxes, setShowBoxes] = useState(() => readBoxesPreference() ?? true);
   const [stillVersion, setStillVersion] = useState(0);
   const [theme, setTheme] = useState(readTheme);
+  const [voiceLang, setVoiceLang] = useState(readVoiceLanguage);
+  const [voiceLangs, setVoiceLangs] = useState([]);
+  const hindiReady = voiceLangs.some((lang) => lang.toLowerCase().startsWith("hi"));
+  const speechLang = voiceLang === "hi" && hindiReady ? "hi" : "en";
+
+  function chooseVoiceLanguage(next) {
+    setVoiceLang(next);
+    try {
+      window.localStorage.setItem(VOICE_LANGUAGE_KEY, next);
+    } catch {
+      return;
+    }
+  }
 
   function toggleTheme() {
     const next = theme === "light" ? "dark" : "light";
@@ -205,6 +243,12 @@ function App() {
   }, []);
 
   useEffect(() => startVoiceOwnership(), []);
+
+  useEffect(() => watchVoices(setVoiceLangs), []);
+
+  useEffect(() => {
+    announcer.current.setLanguage(speechLang);
+  }, [speechLang]);
 
   useEffect(() => {
     const update = () => setVoiceHere(ownsVoice());
@@ -354,17 +398,7 @@ function App() {
     [plan.steps],
   );
 
-  const shortStep = useCallback(
-    (stepId) =>
-      describeStep(stepId)
-        .replace(/\s*\([^)]*\)/g, "")
-        .replace(/^slawosz\s+/i, "")
-        .split(SPEECH_CLAUSE_BREAK)[0]
-        .split(/\s+/)
-        .slice(0, SPEECH_LABEL_WORDS)
-        .join(" "),
-    [describeStep],
-  );
+  const shortStep = useCallback((stepId) => shortenStep(describeStep(stepId)), [describeStep]);
 
   const say = useCallback(
     (text, kind = "info") => {
@@ -384,25 +418,38 @@ function App() {
       spokenEvents.current = new Set(events.map(eventKey));
       return;
     }
+    const completedIds = new Set(
+      [...sessionLog, ...events].filter((event) => event.step_status === "completed").map((event) => event.step_id),
+    );
     for (const event of events) {
       const key = eventKey(event);
       if (spokenEvents.current.has(key)) continue;
       spokenEvents.current.add(key);
       if (!voiceOn || !ownsVoice()) continue;
       const number = stepNumber(event.step_id);
-      const name = number ? `Step ${number}` : capitalise(describeStep(event.step_id));
+      const label = number ? phrases(speechLang).step(number) : capitalise(describeStep(event.step_id));
       if (isAlertEvent(event)) {
         playTone(440, 160, 2);
-        if (event.step_status === "skipped") say(`Alert. ${name} skipped.`, "alert");
-        else if (event.alert_code === "OUT_OF_ORDER") say(`Alert. ${name} done out of order.`, "alert");
-        else if (event.alert_code === "PAUSE_EXCEEDED") say(`Alert. No progress on ${name.toLowerCase()}.`, "alert");
-        else say(`Alert on ${name.toLowerCase()}.`, "alert");
+        say(alertText(speechLang, event, label), "alert");
       } else if (event.step_status === "completed") {
         playTone(880, 90);
-        say(`${name} done. ${capitalise(shortStep(event.step_id))}.`, "step");
+        if (event.extra?.out_of_order) {
+          say(phrases(speechLang).done(label), "step");
+          continue;
+        }
+        const next = nextStepAfter(plan.steps, event.step_id, completedIds);
+        say(
+          stepCompletedText(speechLang, {
+            label,
+            next,
+            nextNumber: next ? stepNumber(next.id) : null,
+            nextFallback: next ? capitalise(shortStep(next.id)) : "",
+          }),
+          "step",
+        );
       }
     }
-  }, [loaded, events, voiceOn, say, stepNumber, describeStep, shortStep]);
+  }, [loaded, events, sessionLog, plan.steps, voiceOn, say, speechLang, stepNumber, describeStep, shortStep]);
 
   useEffect(() => {
     const unlock = () => unlockAudio();
@@ -431,14 +478,16 @@ function App() {
     const missed = summary.missed_steps || [];
     const late = summary.out_of_order_steps || [];
     say(
-      `Analysis finished. ${summary.completed_steps.length} of ${summary.total_steps} steps done.` +
-        (skipped.length ? ` Skipped: step ${numbers(skipped)}.` : "") +
-        (late.length ? ` Out of order: step ${numbers(late)}.` : "") +
-        (missed.length ? ` Not reached: step ${numbers(missed)}.` : "") +
-        (!skipped.length && !missed.length && !late.length ? " All in order." : ""),
+      summaryText(speechLang, {
+        done: summary.completed_steps.length,
+        total: summary.total_steps,
+        skipped: skipped.length ? numbers(skipped) : "",
+        late: late.length ? numbers(late) : "",
+        missed: missed.length ? numbers(missed) : "",
+      }),
       "summary",
     );
-  }, [loaded, status.summary, status.running, status.started_at, say, stepNumber, describeStep]);
+  }, [loaded, status.summary, status.running, status.started_at, say, speechLang, stepNumber, describeStep]);
 
   const frameSession = encodeURIComponent(status.started_at || "current");
   const imageUrl = !status.has_frame
@@ -460,6 +509,7 @@ function App() {
       if (event.step_status === "skipped") return { ...base, tone: "danger", icon: "skip", title: `${label} skipped`, isAlert: true };
       if (event.alert_code === "OUT_OF_ORDER") return { ...base, tone: "warn", icon: "clock", title: `${label} done out of order`, isAlert: true };
       if (event.alert_code === "PAUSE_EXCEEDED") return { ...base, tone: "warn", icon: "alert", title: `No progress on ${label.toLowerCase()}`, isAlert: true };
+      if (event.alert_code === "STEP_OVERDUE") return { ...base, tone: "warn", icon: "clock", title: `${label} taking longer than planned`, isAlert: true };
       if (event.alert_code) {
         const code = event.alert_code.replaceAll("_", " ").toLowerCase();
         return { ...base, tone: "danger", icon: "alert", title: `${capitalise(code)} on ${label.toLowerCase()}`, isAlert: true };
@@ -593,6 +643,30 @@ function App() {
         body: JSON.stringify({ source }),
       });
       setLiveOpen(false);
+      announceStart("started");
+      await refresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function announceStart(verb) {
+    const active = await readJson("/api/plan").catch(() => null);
+    if (!active) return;
+    say(startText(speechLang, { verb, plan: active, fallbackFirst: capitalise(shortenStep(active.steps?.[0]?.description)) }));
+  }
+
+  async function applyStreamOut(settings) {
+    setBusy(true);
+    setError("");
+    try {
+      await readJson("/api/stream-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
       await refresh();
     } catch (requestError) {
       setError(requestError.message);
@@ -668,13 +742,12 @@ function App() {
       setLocalAnalysis(data);
       const known = analyzableActivities.find((activity) => activity.id === data.activity_id);
       const name = known?.name || data.scores.find((score) => score.activity_id === data.activity_id)?.name || data.activity_id;
-      const verb = selectedExperiment ? "Selected" : "Recognised";
       if (!data.recognized) {
-        say("Experiment not recognised.");
+        say(phrases(speechLang).notRecognised);
       } else if (known?.mode === "unavailable") {
-        say(`${verb} ${name}, but it cannot be monitored yet.`);
+        say(phrases(speechLang).unavailable(spokenName({ name }, speechLang)));
       } else {
-        say(`${verb} ${name}. Monitoring.`);
+        await announceStart(selectedExperiment ? "selected" : "recognised");
       }
       await refresh();
     } catch (requestError) {
@@ -743,7 +816,14 @@ function App() {
 
   let now = null;
   if (analyzing) now = { label: "Starting", text: selectedExperiment ? "Uploading the video" : "Recognising the experiment" };
-  else if (status.running && currentStep) now = { label: `Step ${currentStepIndex + 1} of ${totalSteps}`, text: currentStep.description };
+  else if (status.running && currentStep) {
+    const upcoming = stepsView.slice(currentStepIndex + 1).find((step) => step.state === "pending");
+    now = {
+      label: `Step ${currentStepIndex + 1} of ${totalSteps}`,
+      text: currentStep.instruction?.en || currentStep.description,
+      next: upcoming ? upcoming.instruction?.en || capitalise(shortStep(upcoming.id)) : null,
+    };
+  }
   else if (status.running && status.has_frame) now = { label: "Complete", text: "Every step has been observed. Watching until the video ends." };
   else if (status.running) now = { label: "Starting", text: status.message || "Preparing the models" };
   else if (result) now = { label: "Finished", text: result.detail ? `${result.title}. ${result.detail}.` : `${result.title}.` };
@@ -804,6 +884,8 @@ function App() {
             voiceOn={voiceOn}
             voiceHere={voiceHere}
             onToggleVoice={() => setVoiceOn((on) => !on)}
+            voiceLang={voiceLang}
+            onVoiceLang={chooseVoiceLanguage}
           />
 
           {liveOpen && !status.running && (
@@ -835,6 +917,11 @@ function App() {
             {(analysisError || (connected && error)) && (
               <Callout tone="danger" title="Something went wrong">
                 {analysisError || error}
+              </Callout>
+            )}
+            {voiceLang === "hi" && !hindiReady && (
+              <Callout tone="warn" title="No Hindi voice on this computer, so announcements stay in English">
+                Add one in Windows Settings › Time &amp; language › Speech › Add voices › Hindi, then reload this page.
               </Callout>
             )}
             {status.cpu_fallback && (
@@ -884,6 +971,7 @@ function App() {
               now={now}
               showBoxes={showBoxes}
               onShowBoxes={changeShowBoxes}
+              streaming={status.stream_out?.enabled ? status.stream_out.target : ""}
             />
             <div className="ops-side">
               <ProcedurePanel
@@ -906,6 +994,8 @@ function App() {
                   modeLabel={RECOGNITION_MODES[status.mode] || "Model answers"}
                 />
               )}
+              {!status.running && <EvidencePanel downlink={status.downlink} />}
+              <StreamPanel stream={status.stream_out} onApply={applyStreamOut} busy={busy} />
               <DetailsPanel rows={detailRows} timings={Object.entries(status.timings_ms || {})} />
             </div>
           </div>

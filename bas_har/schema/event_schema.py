@@ -29,6 +29,7 @@ class AlertCode(StrEnum):
     LOW_CONFIDENCE = "LOW_CONFIDENCE"
     PAUSE_EXCEEDED = "PAUSE_EXCEEDED"
     CAMERA_LOST = "CAMERA_LOST"
+    STEP_OVERDUE = "STEP_OVERDUE"
 
 
 class EventRecord(BaseModel):

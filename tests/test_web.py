@@ -13,7 +13,13 @@ from bas_har.schema.cli import load_plan
 from bas_har.schema.recognition_schema import ActivityRecognition
 from bas_har.studio.registry import ActivityRegistry
 from bas_har.studio.takes import register_take
-from bas_har.web.server import DashboardServer, WebState, _plan_summary, _source_value
+from bas_har.web.server import (
+    DashboardServer,
+    WebState,
+    _plan_summary,
+    _source_value,
+    uses_default_classes_only,
+)
 
 
 def test_source_value_converts_camera_indices_only() -> None:
@@ -417,3 +423,108 @@ def test_display_toggle_redraws_the_still_frame_without_boxes() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def _json_request(port: int, path: str, payload: dict | None = None) -> dict:
+    request = Request(
+        f"http://127.0.0.1:{port}{path}",
+        data=None if payload is None else json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="GET" if payload is None else "POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def test_plan_summary_carries_spoken_instructions() -> None:
+    plan = load_plan(Path("activities/cold_stowage_melfi/plan.yaml"))
+    summary = _plan_summary(plan)
+    assert summary["spoken_name"]["en"]
+    assert summary["spoken_name"]["hi"]
+    assert all(step["instruction"]["en"] for step in summary["steps"])
+    assert all(step["instruction"]["hi"] for step in summary["steps"])
+
+
+def test_stream_out_api_merges_settings_and_streams_frames() -> None:
+    import socket
+    import time
+
+    receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    receiver.bind(("127.0.0.1", 0))
+    receiver.settimeout(5)
+    plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    state = WebState(plan)
+    server = DashboardServer(("127.0.0.1", 0), state, "models/yolo11n.pt", "cpu")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_port
+    try:
+        idle = _json_request(port, "/api/stream-out")
+        assert idle["enabled"] is False
+        assert idle["target"] == "127.0.0.1:5000"
+        started = _json_request(
+            port, "/api/stream-out", {"enabled": True, "port": receiver.getsockname()[1]}
+        )
+        assert started["enabled"] is True
+        assert started["player_url"].startswith("udp://@:")
+        for _ in range(10):
+            state.offer_stream(np.zeros((96, 128, 3), np.uint8))
+            time.sleep(0.08)
+        assert receiver.recv(65536)[0] == 0x47
+        deadline = time.time() + 2
+        while state.snapshot()["stream_out"]["frames_sent"] == 0 and time.time() < deadline:
+            time.sleep(0.05)
+        assert state.snapshot()["stream_out"]["frames_sent"] > 0
+        stopped = _json_request(port, "/api/stream-out", {"enabled": False})
+        assert stopped["enabled"] is False
+        assert stopped["port"] == receiver.getsockname()[1]
+        with pytest.raises(HTTPError) as error:
+            _json_request(port, "/api/stream-out", {"host": "not-an-ip"})
+        assert error.value.code == 400
+    finally:
+        state.close_stream()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+        receiver.close()
+
+
+def test_downlink_endpoints_need_a_finished_session(tmp_path: Path) -> None:
+    from bas_har.io.signed_log import (
+        SignedJsonlEventSink,
+        build_downlink,
+        load_or_create_station_key,
+        write_downlink,
+    )
+
+    plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    state = WebState(plan)
+    server = DashboardServer(("127.0.0.1", 0), state, "models/yolo11n.pt", "cpu")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_port
+    try:
+        with pytest.raises(HTTPError) as error:
+            _json_request(port, "/api/downlink")
+        assert error.value.code == 404
+        key = load_or_create_station_key(tmp_path / "keys")
+        sink = SignedJsonlEventSink(tmp_path / "session.jsonl", key, plan)
+        sink.close()
+        downlink = tmp_path / "session.downlink.json"
+        write_downlink(build_downlink(sink, key), downlink)
+        state.update(downlink={"path": str(downlink), "log_path": str(sink.path)})
+        assert _json_request(port, "/api/downlink")["exp_id"] == plan.experiment_id
+        with urlopen(f"http://127.0.0.1:{port}/api/session-log", timeout=5) as response:
+            first = json.loads(response.readline())
+        assert first["payload"]["kind"] == "header"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_default_class_filter_only_applies_to_stock_class_plans() -> None:
+    assert uses_default_classes_only(
+        load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
+    )
+    assert not uses_default_classes_only(load_plan(Path("activities/cold_stowage_melfi/plan.yaml")))

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import re
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -41,6 +42,12 @@ RegionId = Annotated[
     StringConstraints(min_length=1, max_length=64, pattern=_ID_PATTERN.pattern),
 ]
 RegionPolygon = Annotated[list[tuple[float, float]], Field(min_length=3)]
+SpokenText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+
+class SpeechLanguage(StrEnum):
+    ENGLISH = "en"
+    HINDI = "hi"
 
 
 class StrictModel(BaseModel):
@@ -190,8 +197,16 @@ class StepSpec(StrictModel):
     description: str = Field(min_length=1, max_length=500)
     evidence: list[EvidenceRule] = Field(min_length=1)
     next: list[StepId] = Field(default_factory=list)
-    timeout_s: float | None = Field(default=None, gt=0)
+    timeout_s: float | None = Field(
+        default=None,
+        gt=0,
+        description="Seconds the step may stay current before a STEP_OVERDUE alert is raised.",
+    )
     expected_duration_s: float | None = Field(default=None, gt=0)
+    instruction: dict[SpeechLanguage, SpokenText] = Field(
+        default_factory=dict,
+        description="What the crew should do, spoken as the next step. Keyed by language code.",
+    )
 
 
 class AlertPolicy(StrictModel):
@@ -209,6 +224,10 @@ class ExperimentPlan(StrictModel):
     author: str = Field(default="unknown")
     created: str = Field(default="")
     description: str = Field(default="")
+    spoken_name: dict[SpeechLanguage, SpokenText] = Field(
+        default_factory=dict,
+        description="How voice announcements name the procedure. Keyed by language code.",
+    )
 
     @field_validator("created", mode="before")
     @classmethod

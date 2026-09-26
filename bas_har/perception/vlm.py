@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -35,6 +36,14 @@ def filled_answer(count: int, fill: str) -> tuple[str, list[str]]:
     return body, prefixes
 
 
+def load_cached_first(loader: Callable[..., Any], model_id: str, **kwargs: Any) -> Any:
+    """Load from the local model cache without touching the network; download only if not cached."""
+    try:
+        return loader(model_id, local_files_only=True, **kwargs)
+    except OSError:
+        return loader(model_id, **kwargs)
+
+
 class FrameQuestioner(Protocol):
     def ask(self, frame_bgr: np.ndarray, questions: list[str]) -> dict[str, float]: ...
 
@@ -58,8 +67,9 @@ class VisualQuestionAnswerer:
             if device == "auto" and torch.cuda.is_available()
             else ("cpu" if device == "auto" else device)
         )
-        self._processor = AutoProcessor.from_pretrained(model_id)
-        self._model = AutoModelForImageTextToText.from_pretrained(
+        self._processor = load_cached_first(AutoProcessor.from_pretrained, model_id)
+        self._model = load_cached_first(
+            AutoModelForImageTextToText.from_pretrained,
             model_id,
             dtype=torch.bfloat16 if resolved.startswith("cuda") else torch.float32,
             device_map=resolved,

@@ -19,6 +19,9 @@ A later (or skipped) step counts as performed once its evidence rules matched in
 detector flicker does not reset confirmation while a brief false detection cannot trigger it. Every step
 between the current step and that later step is recorded as skipped.
 
+A step whose plan sets `timeout_s` raises one STEP_OVERDUE alert when it stays current for longer
+than that, measured from the moment it became the current step.
+
 The pause tolerance while waiting for a step is the plan's `pause_tolerance_s`, raised to
 `PAUSE_DURATION_MARGIN` times the `expected_duration_s` of the step that just completed, because
 that step's activity is still under way while the next step's evidence is awaited.
@@ -26,6 +29,7 @@ that step's activity is still under way while the next step's evidence is awaite
 
 from __future__ import annotations
 
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -86,6 +90,8 @@ class ProcedureEngine:
     _state: EngineState = EngineState.IDLE
     _current: StepSpec | None = field(default=None, init=False)
     _step_started_at_frame: int = field(default=0, init=False)
+    _step_started_at_s: float | None = field(default=None, init=False)
+    _overdue: set[str] = field(default_factory=set, init=False)
     _fired: list[AlertCode] = field(default_factory=list, init=False)
     _frame_counter: int = field(default=0, init=False)
     _last_emit_frame: int = field(default=-10_000, init=False)
@@ -162,6 +168,8 @@ class ProcedureEngine:
         now = self._now
         if self.use_media_time and self._frame_counter == 1:
             self.pause_watchdog.reset(now=now)
+        if self._step_started_at_s is None:
+            self._step_started_at_s = self._clock(now)
 
         satisfied, verdicts = self.accumulator.evaluate_step(self._current, result)
         avg_conf = sum(v.conf for v in verdicts) / max(1, len(verdicts))
@@ -186,7 +194,7 @@ class ProcedureEngine:
                 self._current = None
                 return self._output(current_confidence=smoothed)
             self._current = next_step
-            self._step_started_at_frame = frame_id
+            self._mark_step_started(frame_id, now)
             self.pause_watchdog.tolerance_s = self.pause_tolerance_after(completed)
             self.pause_watchdog.reset(now=now)
             return self._output(current_confidence=smoothed)
@@ -220,6 +228,8 @@ class ProcedureEngine:
                 evidence_summary=rule_summary(verdicts),
             )
 
+        self._check_overdue(smoothed, now)
+
         if made_progress:
             self._consecutive_heartbeat = 0
         else:
@@ -232,6 +242,36 @@ class ProcedureEngine:
                 evidence_summary=rule_summary(verdicts),
             )
         return self._output(current_confidence=smoothed)
+
+    @staticmethod
+    def _clock(now: float | None) -> float:
+        return now if now is not None else time.monotonic()
+
+    def _mark_step_started(self, frame_id: int, now: float | None) -> None:
+        self._step_started_at_frame = frame_id
+        self._step_started_at_s = self._clock(now)
+
+    def _check_overdue(self, smoothed: float, now: float | None) -> None:
+        step = self._current
+        if step is None or step.timeout_s is None or step.id in self._overdue:
+            return
+        if self._step_started_at_s is None:
+            return
+        elapsed = self._clock(now) - self._step_started_at_s
+        if elapsed <= step.timeout_s:
+            return
+        message = f"Step {step.id} has taken longer than {step.timeout_s:g} s."
+        if not self._fire(AlertCode.STEP_OVERDUE, step.id, message, now):
+            return
+        self._overdue.add(step.id)
+        self._emit(
+            step.id,
+            StepStatus.ANOMALOUS,
+            confidence=smoothed,
+            evidence_summary=f"step current for longer than timeout_s ({step.timeout_s:g} s)",
+            alert_code=AlertCode.STEP_OVERDUE,
+            extra={"timeout_s": step.timeout_s, "elapsed_s": round(elapsed, 1)},
+        )
 
     def _later_steps(self) -> list[StepSpec]:
         if self._current is None:
@@ -364,7 +404,7 @@ class ProcedureEngine:
             self._current = None
             return self._output(current_confidence=smoothed)
         self._current = next_step
-        self._step_started_at_frame = result.frame_id
+        self._mark_step_started(result.frame_id, now)
         self.pause_watchdog.tolerance_s = self.pause_tolerance_after(later)
         self.pause_watchdog.reset(now=now)
         return self._output(current_confidence=smoothed)

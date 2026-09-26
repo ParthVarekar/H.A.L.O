@@ -846,6 +846,63 @@ html {
 .ops-timings-label { display: block; padding: 16px 20px 0; color: var(--o-text-2); font-size: 12px; font-weight: 600; }
 .ops-details-grid--compact { grid-template-columns: repeat(3, 1fr); padding-top: 10px; }
 
+/* Voice language */
+
+.ops-lang { display: inline-flex; gap: 2px; height: 36px; padding: 3px; border: 1px solid var(--o-hairline-strong); border-radius: 10px; background: var(--o-surface); }
+
+.ops-lang button {
+  min-width: 34px;
+  padding: 0 8px;
+  color: var(--o-text-3);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ops-lang button:hover { color: var(--o-text-2); }
+.ops-lang button[aria-pressed="true"] { color: var(--o-text); background: var(--o-surface-3); }
+
+/* Stage extras */
+
+.ops-now-next { flex: 0 1 auto; overflow: hidden; color: var(--o-text-3); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.ops-now-next::before { margin-right: 10px; color: var(--o-text-4); content: "·"; }
+.ops-stage-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 14px; }
+
+.ops-stream-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  color: var(--o-ok);
+  border-radius: 999px;
+  background: var(--o-ok-soft);
+  font-family: var(--o-mono);
+  font-size: 11px;
+}
+
+.ops-stream-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--o-ok); animation: ops-pulse 1.6s ease-in-out infinite; }
+
+/* Stream and evidence cards */
+
+.ops-stream-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 16px 20px 12px; }
+.ops-stream-form .ops-live-field { min-width: 140px; }
+.ops-stream-form .ops-stream-port { flex: 0 0 88px; min-width: 88px; }
+.ops-stream-form .ops-input:disabled { color: var(--o-text-2); cursor: default; }
+.ops-card-note.is-danger { color: var(--o-danger); }
+.ops-card-note code { color: var(--o-text-2); font-family: var(--o-mono); font-size: 11px; }
+.ops-details-grid dd.is-mono { font-family: var(--o-mono); font-size: 12px; }
+.ops-evidence .ops-status { gap: 5px; }
+.ops-evidence-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 14px; }
+.ops-evidence-actions .ops-btn { text-decoration: none; }
+
+.ops[data-theme="light"] .ops-lang button[aria-pressed="true"] { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1); }
+.ops[data-theme="light"] .ops-lang { background: var(--o-surface-2); }
+
 /* Drop overlay */
 
 .ops-drop-overlay {

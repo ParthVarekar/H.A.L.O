@@ -81,3 +81,11 @@ models/*.ts
 
 # --- Runtime output (session logs, uploaded videos, recordings) ---
 logs/
+
+# --- Station signing keys (private) ---
+keys/
+
+# --- Remotion intro video ---
+video/node_modules/
+video/out/
+video/public/footage/

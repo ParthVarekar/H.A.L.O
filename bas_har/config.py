@@ -35,6 +35,12 @@ def logs_dir() -> Path:
     return path
 
 
+def keys_dir() -> Path:
+    path = project_root() / "keys"
+    path.mkdir(exist_ok=True)
+    return path
+
+
 def default_camera_source() -> int:
     env = os.environ.get("BAS_HAR_CAMERA")
     if env and env.isdigit():

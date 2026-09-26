@@ -62,9 +62,38 @@ export function startVoiceOwnership() {
   };
 }
 
+const LANGUAGE_TAGS = { en: ["en-in", "en-gb", "en-us", "en"], hi: ["hi-in", "hi"] };
+
+function localVoices() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
+  return window.speechSynthesis.getVoices().filter((voice) => voice.localService);
+}
+
+export function pickVoice(lang) {
+  const voices = localVoices();
+  for (const tag of LANGUAGE_TAGS[lang] || [lang]) {
+    const match = voices.find((voice) => voice.lang.toLowerCase().replace("_", "-").startsWith(tag));
+    if (match) return match;
+  }
+  return null;
+}
+
+export function hasLocalVoice(lang) {
+  return pickVoice(lang) !== null;
+}
+
+export function watchVoices(onChange) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return () => undefined;
+  const notify = () => onChange(localVoices().map((voice) => voice.lang));
+  notify();
+  window.speechSynthesis.addEventListener("voiceschanged", notify);
+  return () => window.speechSynthesis.removeEventListener("voiceschanged", notify);
+}
+
 export class Announcer {
   constructor(rate) {
     this.rate = rate;
+    this.lang = "en";
     this.queue = [];
     this.current = null;
     this.watchdog = null;
@@ -72,6 +101,10 @@ export class Announcer {
 
   get available() {
     return typeof window !== "undefined" && "speechSynthesis" in window;
+  }
+
+  setLanguage(lang) {
+    this.lang = lang;
   }
 
   enqueue(text, kind = "info") {
@@ -99,6 +132,11 @@ export class Announcer {
     const item = this.queue.shift();
     const utterance = new SpeechSynthesisUtterance(item.text);
     utterance.rate = this.rate;
+    const voice = pickVoice(this.lang);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
     const token = { item };
     this.current = token;
     const finish = () => {

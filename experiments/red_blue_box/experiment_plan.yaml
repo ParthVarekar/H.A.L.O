@@ -1,5 +1,8 @@
 id: BAS-DEMO-RBB-001
 name: "Red/Blue Box Sort"
+spoken_name:
+  en: "red and blue box sort"
+  hi: "लाल-नीला बॉक्स छँटाई"
 version: 0.1.0
 author: parth
 created: 2026-09-03
@@ -40,6 +43,9 @@ region_geometries:
 steps:
   - id: open_big_box
     description: "Astronaut opens the lid and exposes both colored blocks."
+    instruction:
+      en: "Open the lid of the big box."
+      hi: "बड़े बॉक्स का ढक्कन खोलें।"
     evidence:
       - kind: hand_object_interaction
         object: big_box
@@ -51,6 +57,9 @@ steps:
 
   - id: remove_red_box
     description: "Astronaut picks up and removes the red block from the box."
+    instruction:
+      en: "Take the red block out of the box."
+      hi: "लाल ब्लॉक को बॉक्स से बाहर निकालें।"
     evidence:
       - kind: hand_object_interaction
         object: small_red_box
@@ -62,6 +71,9 @@ steps:
 
   - id: place_red_box
     description: "Astronaut returns the red block into the box."
+    instruction:
+      en: "Put the red block back in the box."
+      hi: "लाल ब्लॉक को वापस बॉक्स में रखें।"
     evidence:
       - kind: hand_object_interaction
         object: small_red_box
@@ -77,6 +89,9 @@ steps:
 
   - id: remove_blue_box
     description: "Astronaut picks up and removes the blue block from the box."
+    instruction:
+      en: "Take the blue block out of the box."
+      hi: "नीले ब्लॉक को बॉक्स से बाहर निकालें।"
     evidence:
       - kind: hand_object_interaction
         object: small_blue_box
@@ -88,6 +103,9 @@ steps:
 
   - id: place_blue_box
     description: "Astronaut returns the blue block into the box."
+    instruction:
+      en: "Put the blue block back in the box."
+      hi: "नीले ब्लॉक को वापस बॉक्स में रखें।"
     evidence:
       - kind: hand_object_interaction
         object: small_blue_box
@@ -103,6 +121,9 @@ steps:
 
   - id: close_big_box
     description: "Astronaut closes the lid of the big box."
+    instruction:
+      en: "Close the lid of the big box."
+      hi: "बड़े बॉक्स का ढक्कन बंद करें।"
     evidence:
       - kind: hand_object_interaction
         object: big_box

@@ -859,3 +859,45 @@ completed in the summary; decide whether to gitignore `activities/*/models/*.pt`
 - The Operations dashboard has a light theme. A sun/moon button in the app bar switches it and the choice is saved in the browser (`bas-har-theme`); `?theme=light` or `?theme=dark` forces one. The video stage stays dark in both themes. The Training Studio is unchanged.
 - Every README image is now light: the demo, both product shots and the model-answers card were re-captured from the light dashboard, and the dark banner and diagram were removed.
 - The README follows patterns from awesome-readme: a collapsible table of contents, back-to-top links, a "Why it matters" section, a feature-grid graphic (`features.png`), a recognition-modes graphic (`modes.png`: described, trained, hybrid), a gallery, a collapsible FAQ and a "Built with" strip. 215 tests pass, Ruff clean.
+
+## Checkpoint 39 - 2026-09-26 - Every SIH26174 requirement closed and verifiable
+
+Prompted by the competitor scan (51 rival repositories): we held real footage, real weights and real metrics, but requirement 5 was half-met, requirement 2 was only implicit, the "tamper-evident" log was per-line CRC, and there was nothing a judge could run.
+
+- **Stream to a specific IP (requirement 5):** `bas_har/io/stream_out.py` `UdpStreamPublisher` sends the annotated video as MPEG-TS over UDP (h264_nvenc, then libx264, h264_mf, mpeg2video) on its own thread with a newest-frame slot. `StreamOutputSettings` schema; `GET/POST /api/stream-out`; `--stream-to udp://ip:port`; `BAS_HAR_STREAM_TO` and opt-in `BAS_HAR_HOST` in `startup.bat`; a "Stream to IP" card in the dashboard. Recordings now go to a per-session folder under `logs/buffer/<exp>/`.
+- **Next step spoken (requirement 2):** `StepSpec.instruction` and `ExperimentPlan.spoken_name` (keyed `en`/`hi`), filled in for the MELFI, MELFI-described and red/blue plans. `web/src/speech.js` builds every phrase in English and Hindi: "Monitoring ... First: ...", "Step N done. Next: ...", "Procedure complete.", alerts and the summary. The Now bar shows the next instruction. Local voices only; English prefers an en-IN voice; the EN/हिं switch falls back to English with a notice when Windows has no Hindi voice.
+- **Step overdue alert:** the engine raises `STEP_OVERDUE` once when a step stays current past its plan `timeout_s`.
+- **Signed record (requirement 4):** `bas_har/io/signed_log.py`: each line is `{seq, payload, prev, hash, sig}` with a SHA-256 chain and an Ed25519 signature by a per-machine station key in `keys/` (gitignored). At session end a signed downlink report (~1 KB) seals the final hash and event count. The dashboard shows it verified with the size ratio, and `/api/downlink` and `/api/session-log` download it. `cryptography` is now a core dependency (AGENTS.md rule 4 updated).
+- **Reproduction for judges:** `python -m bas_har verify` (also `startup.bat verify`) validates every plan, runs the ISS take through the dashboard's own session runner, checks 8/8 in order, 0 alerts and both signatures, then runs `activities/cold_stowage_melfi/verification/step1_removed.mp4` (the same footage from 12 s) and checks the skip is caught. Result: 8/8 checks pass in about a minute. `verify-log` and `verify-downlink` subcommands.
+- **Offline:** the vision-language model loads with `local_files_only=True` first.
+- **Fix:** starting from the launch config with a custom detector filtered detections to the stock classes, so MELFI stuck on step 1. The server now filters only when every plan class is a stock class.
+- **Docs:** `docs/SIH_REQUIREMENTS.md` (traceability), `docs/VERIFICATION.md` (three commands and expected output), `docs/JURY_DEMO.md` (timed five-minute script). README gains a requirements table, "Verify it yourself", new features and FAQ entries, and a refreshed `features.png`. USP.md updated. 276 tests pass, Ruff clean.
+
+## Checkpoint 40 - 2026-09-26 - Intro video in Remotion
+
+- New `video/` Remotion 4.0.529 project (React + TypeScript). It renders `docs/assets/intro.mp4` (1920×1080, 30 fps, 66 s, 11.8 MB) and `docs/assets/intro-poster.jpg`.
+- Nine calm scenes, one idea each, on the light product palette:
+  1. procedure → missed step;
+  2. name;
+  3. recognises equipment and its state;
+  4. tells the crew what comes next;
+  5. notices skips and out-of-order steps;
+  6. plain-language setup;
+  7. offline in real time;
+  8. signed kilobyte record;
+  9. close.
+- Everything shown is real:
+  - the ESA Ignis clip, with boxes from the trained detector's own output (`public/detections.json`), curated to the one part that matters at each moment;
+  - step times from a verified downlink report;
+  - the skip timings from the step-1-removed clip;
+  - the 80% answer from the model-answers card;
+  - the 1,002-byte report.
+- Audio: the dashboard's announcement "Step 2 done. Next: pull tray 2 out of dewar 1." spoken by Microsoft Heera through the Windows speech API, over a synthesised ambient pad about 7 dB below it.
+- The upscaled footage clip is gitignored and regenerated with the ffmpeg command in `video/README.md`. The README links the intro next to the demo.
+- Second pass, same day: the intro is now 36 s and much more kinetic.
+  - Visuals: word-by-word headlines rising out of a mask; cards flying in with a 3D tilt; a slow camera push on every scene; a drifting backdrop; scenes that dolly into each other with a blur.
+  - Details: a detection scan line; boxes that draw their outline; check marks that pop with a burst; a "Next" highlight that glides between rows; a pulsing alert that shakes in; count-up stats; and a byte counter running from 9,720,664 down to 1,002 as the log collapses into the signed report.
+  - Footage now plays at 1.7×.
+  - Sound: synthesised whooshes, ticks, chimes and impacts, plus the dashboard's own 440 Hz alert, over a 112 BPM music bed that ducks under the voice line.
+- Third pass: every animation keeps its speed, and each beat is now followed by a short hold (0.6–1 s) so viewers can take it in. The scene freezes while the backdrop keeps drifting; holds are listed per scene in `video/src/Intro.tsx` and remapped with `<Freeze>`. The video is now 50.5 s. Also fixed the byte counter, which stopped at 10,494 instead of 1,002 because its easing never reached 1.
+- Fourth pass: the ISS footage no longer pauses. Its scene has no holds; instead the clip plays at 1.2x (was 1.7x) over a longer scene, so each detection box stays readable while the footage keeps moving. Box carry-over widened to 20 detection frames to bridge a 0.76 s gap in the hatch detections. The video is now 50.8 s.

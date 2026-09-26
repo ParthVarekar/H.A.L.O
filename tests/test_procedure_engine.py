@@ -373,3 +373,47 @@ def test_wall_clock_mode_does_not_record_video_time() -> None:
         out = engine.step(_result_with_hoi("a"))
     assert out.last_event is not None
     assert "video_time_s" not in out.last_event.extra
+
+
+def _overdue_events(engine_events: list[EventRecord]) -> list[EventRecord]:
+    return [event for event in engine_events if event.alert_code == AlertCode.STEP_OVERDUE]
+
+
+def test_step_overdue_fires_once_after_timeout() -> None:
+    plan = _plan()
+    plan.alert_policy.pause_tolerance_s = 100.0
+    plan.steps[0].timeout_s = 3.0
+    engine = build_engine(plan, use_media_time=True)
+    seen: list[EventRecord] = []
+    for second in (0.0, 1.0, 2.9):
+        seen += engine.step(_at(_empty_result(), second)).events
+    assert _overdue_events(seen) == []
+    for second in (3.2, 4.0, 9.0):
+        seen += engine.step(_at(_empty_result(), second)).events
+    overdue = _overdue_events(seen)
+    assert len(overdue) == 1
+    assert overdue[0].step_id == "do_a"
+    assert overdue[0].step_status == StepStatus.ANOMALOUS
+    assert overdue[0].extra["timeout_s"] == 3.0
+
+
+def test_step_overdue_clock_restarts_for_each_step() -> None:
+    plan = _plan()
+    plan.alert_policy.pause_tolerance_s = 100.0
+    plan.steps[1].timeout_s = 3.0
+    engine = build_engine(plan, use_media_time=True)
+    engine.step(_at(_result_with_hoi("a"), 10.0))
+    out = engine.step(_at(_result_with_hoi("a"), 10.1))
+    assert out.current_step_id == "do_b"
+    assert _overdue_events(engine.step(_at(_empty_result(), 12.0)).events) == []
+    assert len(_overdue_events(engine.step(_at(_empty_result(), 13.5)).events)) == 1
+
+
+def test_step_without_timeout_never_goes_overdue() -> None:
+    plan = _plan()
+    plan.alert_policy.pause_tolerance_s = 1000.0
+    engine = build_engine(plan, use_media_time=True)
+    seen: list[EventRecord] = []
+    for second in (0.0, 100.0, 500.0):
+        seen += engine.step(_at(_empty_result(), second)).events
+    assert _overdue_events(seen) == []

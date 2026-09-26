@@ -15,6 +15,7 @@ from bas_har.schema.plan_schema import (
     EvidenceRule,
     ExperimentPlan,
     ObjectSpec,
+    SpeechLanguage,
 )
 
 
@@ -210,3 +211,27 @@ def test_experiment_plan_requires_at_least_one_step() -> None:
     raw["steps"] = []
     with pytest.raises(ValidationError, match="at least 1 item"):
         ExperimentPlan.model_validate(raw)
+
+
+def test_experiment_plan_accepts_spoken_text_in_english_and_hindi() -> None:
+    data = _minimal_plan()
+    data["spoken_name"] = {"en": "Box check", "hi": "बॉक्स जाँच"}
+    data["steps"][0]["instruction"] = {"en": " Open the box ", "hi": "बॉक्स खोलें"}
+    plan = ExperimentPlan.model_validate(data)
+    assert plan.spoken_name[SpeechLanguage.HINDI] == "बॉक्स जाँच"
+    assert plan.steps[0].instruction[SpeechLanguage.ENGLISH] == "Open the box"
+    assert plan.steps[1].instruction == {}
+
+
+def test_experiment_plan_rejects_unknown_speech_language() -> None:
+    data = _minimal_plan()
+    data["steps"][0]["instruction"] = {"fr": "Ouvrez la boîte"}
+    with pytest.raises(ValidationError):
+        ExperimentPlan.model_validate(data)
+
+
+def test_experiment_plan_rejects_empty_instruction() -> None:
+    data = _minimal_plan()
+    data["steps"][0]["instruction"] = {"en": "   "}
+    with pytest.raises(ValidationError):
+        ExperimentPlan.model_validate(data)

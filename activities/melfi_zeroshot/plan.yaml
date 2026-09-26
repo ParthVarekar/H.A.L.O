@@ -1,5 +1,8 @@
 id: melfi_zeroshot
 name: MELFI Sample Stowage (described, not trained)
+spoken_name:
+  en: "MELFI sample stowage"
+  hi: "MELFI सैंपल भंडारण"
 version: 0.4.0
 author: local
 created: '2026-09-22'
@@ -59,6 +62,9 @@ objects:
 steps:
 - id: step_01
   description: The astronaut holds the sample pouch.
+  instruction:
+    en: "Hold up the sample pouch."
+    hi: "सैंपल पाउच को हाथ में पकड़ें।"
   evidence:
   - kind: visual_question
     question: Is the astronaut holding a small plastic sample bag or pouch in their hands?
@@ -70,6 +76,9 @@ steps:
   expected_duration_s: 11
 - id: step_02
   description: A tray is pulled out of the freezer.
+  instruction:
+    en: "Pull a tray out of the freezer."
+    hi: "फ्रीज़र से एक ट्रे बाहर निकालें।"
   evidence:
   - kind: visual_question
     question: Is a long cylindrical tray pulled out of the freezer, or held in the astronaut's hands?
@@ -81,6 +90,9 @@ steps:
   expected_duration_s: 6
 - id: step_03
   description: The sample leaves the astronaut's hands while the tray is out.
+  instruction:
+    en: "Place the sample in the tray."
+    hi: "सैंपल को ट्रे में रखें।"
   evidence:
   - kind: visual_question
     question: Is the astronaut holding a small plastic sample bag or pouch in their hands?
@@ -96,6 +108,9 @@ steps:
   expected_duration_s: 12
 - id: step_04
   description: The tray is pushed back in; the open door is visible.
+  instruction:
+    en: "Push the tray back in."
+    hi: "ट्रे को वापस अंदर धकेलें।"
   evidence:
   - kind: visual_question
     question: Is a long cylindrical tray pulled out of the freezer, or held in the astronaut's hands?
@@ -111,6 +126,9 @@ steps:
   expected_duration_s: 6
 - id: step_05
   description: The freezer door is closed.
+  instruction:
+    en: "Close the freezer door."
+    hi: "फ्रीज़र का दरवाज़ा बंद करें।"
   evidence:
   - kind: visual_question
     question: Is one of the round freezer doors open, so the inside of the freezer is visible?

@@ -20,15 +20,17 @@ demo is a config, not code.
 3. **YAML is the only place experiment-specific knowledge lives.** No hard-coded step lists in
    Python. No hard-coded class names. If you find yourself writing `if step == "open box"`,
    stop and add an evidence rule to the YAML schema.
-4. **No ML dependencies in Phase 0.** `pyproject.toml` `dependencies` stays lean (pydantic,
-   pyyaml, loguru). ML deps live in `perception` extra until Phase 1.
+4. **No ML dependencies in core.** `pyproject.toml` `dependencies` stays lean (pydantic,
+   pyyaml, loguru, cryptography). `cryptography` is core because every event log is Ed25519-signed.
+   ML deps live in the `perception` extra.
 5. **Tests are mandatory for every public function in `bas_har/`.** No `_` prefixes unless the
    function is a true private helper used in one place.
 6. **Python version pin is `<3.14`** in `pyproject.toml` because MediaPipe / PyTorch wheels
    lag. If you bump it, update `requires-python` and add a note here.
 7. **Single source of truth for paths.** Use `pathlib.Path`; never `os.path.join`.
-8. **One command per CLI.** `python -m bas_har` and `validate-plan` are the only entry points
-   for now. No `python scripts/foo.py`.
+8. **One command per CLI.** `python -m bas_har` (subcommands `verify`, `verify-log`,
+   `verify-downlink`) and `validate-plan` are the only entry points for now. No
+   `python scripts/foo.py`.
 
 ## Layout
 
