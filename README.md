@@ -24,17 +24,16 @@
   <a href="#how-it-works"><b>How it works</b></a> ·
   <a href="#verify-it-yourself"><b>Verify it yourself</b></a> ·
   <a href="USP.md"><b>Why BAS-HAR</b></a> ·
-  <a href="docs/assets/demo.mp4"><b>Watch the demo</b></a> ·
-  <a href="docs/assets/intro.mp4"><b>Watch the intro</b></a>
+  <a href="docs/assets/demo.mp4"><b>Watch the demo</b></a>
 </p>
 
 <br>
 
 <p align="center">
-  <a href="docs/assets/intro.mp4"><img alt="BAS-HAR intro: what it does, in under a minute" src="docs/assets/intro.webp" width="100%"></a>
+  <img alt="BAS-HAR intro: what it does, in under a minute" src="docs/assets/intro.webp" width="100%">
 </p>
 <p align="center">
-  <sub>BAS-HAR in under a minute. <a href="docs/assets/intro.mp4">Watch with sound</a>.</sub>
+  <sub>BAS-HAR in under a minute.</sub>
 </p>
 
 <br>
