@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="web/public/favicon.svg" width="72" alt="BAS-HAR logo" />
+  <img src="web/public/favicon.svg" width="72" alt="H.A.L.O. logo" />
 </p>
 
-<h1 align="center">Why BAS-HAR</h1>
+<h1 align="center">Why H.A.L.O.</h1>
 
 <p align="center"><i>An on-board second pair of eyes for every experiment on the Bharatiya Antariksh Station.</i></p>
 
@@ -10,7 +10,7 @@
 
 ## The one-line pitch
 
-**BAS-HAR watches an astronaut carry out a science procedure and knows, step by step and in real
+**H.A.L.O. watches an astronaut carry out a science procedure and knows, step by step and in real
 time, whether it is being done right, and it says so out loud, with no internet, on a laptop.**
 
 ---
@@ -19,18 +19,18 @@ time, whether it is being done right, and it says so out loud, with no internet,
 
 All seven requirements of the problem statement are implemented, and each one is traced to its code,
 its tests and a moment in the live demo in [docs/SIH_REQUIREMENTS.md](docs/SIH_REQUIREMENTS.md). The
-headline result is not a claim you have to take on trust: `python -m bas_har verify` replays the ISS
+headline result is not a claim you have to take on trust: `python -m halo verify` replays the ISS
 footage that ships in the repository and checks every step, every alert and every signature in about
 a minute. It also replays the same footage with a step cut out and confirms the skip is caught.
 
 ## 2. It is proven on real space-station footage, not a lab mock-up
 
-BAS-HAR was built and demonstrated on genuine International Space Station video of the MELFI
+H.A.L.O. was built and demonstrated on genuine International Space Station video of the MELFI
 −80 °C freezer sample-stowage procedure, performed by an ESA astronaut during the Ignis mission.
 On that procedure it recognises **all 8 steps, in order, each within about one second of the
 moment it happens on screen, with zero false alerts**, at full real-time speed.
 
-Most activity-recognition projects stop at "person detected" or "hand moving". BAS-HAR tracks
+Most activity-recognition projects stop at "person detected" or "hand moving". H.A.L.O. tracks
 whether a specific dewar hatch is open, which tray has been pulled out, whether a compartment lid is
 up, and whether the sample is actually *inside* that compartment.
 
@@ -49,7 +49,7 @@ of AI you can put in front of a flight-safety reviewer.
 ## 4. Teach it a new experiment in plain English: no training required
 
 This is the headline capability. Describe the objects in words, write each step as a yes/no question
-("Is a long cylindrical tray pulled out of the freezer?"), and BAS-HAR monitors the procedure
+("Is a long cylindrical tray pulled out of the freezer?"), and H.A.L.O. monitors the procedure
 immediately. A local vision-language model answers the questions several times a second, and an
 open-vocabulary detector finds objects from their descriptions alone.
 
@@ -101,7 +101,7 @@ Built for a crew member whose eyes and hands are busy:
 
 ## 9. It recognises the experiment by itself
 
-Drop in a video and BAS-HAR works out which procedure it shows by comparing its scenes with every
+Drop in a video and H.A.L.O. works out which procedure it shows by comparing its scenes with every
 procedure in its library, then starts monitoring the right plan automatically. There is no menu
 hunting and no manual configuration.
 
@@ -156,7 +156,7 @@ in VLC on any computer on the network, while the station keeps its own rolling r
 ## Built for the BAS timeline
 
 India's first station module is planned for 2028, with a full station by 2035. Every experiment on
-it will run on procedures, and every procedure can become a BAS-HAR plan. The system is proven
+it will run on procedures, and every procedure can become a H.A.L.O. plan. The system is proven
 today on ISS-class footage and is ready to grow its procedure library as BAS payloads are defined.
 
 <p align="center"><b>Describe it. Watch it. Trust it.</b></p>

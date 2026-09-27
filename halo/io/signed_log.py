@@ -21,8 +21,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from pydantic import ValidationError
 
-from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
-from bas_har.schema.evidence_schema import (
+from halo.schema.event_schema import AlertCode, EventRecord, StepStatus
+from halo.schema.evidence_schema import (
     DownlinkAlert,
     DownlinkReport,
     DownlinkStep,
@@ -31,7 +31,7 @@ from bas_har.schema.evidence_schema import (
     SignedLogLine,
     SignedLogReport,
 )
-from bas_har.schema.plan_schema import ExperimentPlan
+from halo.schema.plan_schema import ExperimentPlan
 
 GENESIS_HASH = "0" * 64
 PRIVATE_KEY_NAME = "station_ed25519.pem"

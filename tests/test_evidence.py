@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from bas_har.perception.types import BBox, Detection, PerceptionResult
-from bas_har.procedure.evidence import EvidenceAccumulator, perception_needs
-from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
+from halo.perception.types import BBox, Detection, PerceptionResult
+from halo.procedure.evidence import EvidenceAccumulator, perception_needs
+from halo.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
 
 
 def _result(*detections: Detection) -> PerceptionResult:

@@ -28,8 +28,8 @@ if not exist "%WEB_INDEX%" (
 
 powershell.exe -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5767/api/health' -TimeoutSec 1 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
 if errorlevel 1 (
-    echo Starting BAS-HAR Training Studio server...
-    start "BAS-HAR Training Studio" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --yolo-model "models\yolo11n.pt" --device auto --host 127.0.0.1 --port 5767 --no-start >nul 2>&1
+    echo Starting H.A.L.O. Training Studio server...
+    start "H.A.L.O. Training Studio" /b "%PYTHON%" -m halo.web.server --plan "%PLAN%" --yolo-model "models\yolo11n.pt" --device auto --host 127.0.0.1 --port 5767 --no-start >nul 2>&1
     for /l %%I in (1,1,20) do (
         powershell.exe -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5767/api/health' -TimeoutSec 1 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
         if not errorlevel 1 goto open_studio

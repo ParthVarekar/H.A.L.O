@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
-from bas_har.procedure.smoothing import RateLimiter, SilenceWindow
-from bas_har.schema.event_schema import AlertCode
-from bas_har.schema.plan_schema import AlertPolicy
+from halo.procedure.smoothing import RateLimiter, SilenceWindow
+from halo.schema.event_schema import AlertCode
+from halo.schema.plan_schema import AlertPolicy
 
 
 @dataclass(slots=True)

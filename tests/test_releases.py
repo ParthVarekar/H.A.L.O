@@ -6,16 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from bas_har.schema.activity_schema import (
+from halo.schema.activity_schema import (
     ActivityKind,
     ActivityManifest,
     EvaluationReport,
     ReleaseStatus,
 )
-from bas_har.studio.evaluation import load_evaluation_report
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.releases import activate_release, approve_release, create_candidate
-from bas_har.studio.verification import release_audit_csv, verify_activity_package
+from halo.studio.evaluation import load_evaluation_report
+from halo.studio.registry import ActivityRegistry
+from halo.studio.releases import activate_release, approve_release, create_candidate
+from halo.studio.verification import release_audit_csv, verify_activity_package
 
 
 def _registry(tmp_path: Path, passed: bool = True) -> tuple[ActivityRegistry, Path]:

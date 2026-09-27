@@ -29,8 +29,8 @@ from pathlib import Path
 
 import cv2
 
-from bas_har import config
-from bas_har.config import default_camera_source
+from halo import config
+from halo.config import default_camera_source
 
 
 @dataclass(slots=True)
@@ -146,7 +146,7 @@ def record(
                 (0, 255, 0) if recording else (0, 0, 255),
                 2,
             )
-            cv2.imshow("bas_har recorder", preview)
+            cv2.imshow("halo recorder", preview)
 
             if recording and writer is not None:
                 writer.write(frame)

@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from bas_har.schema.plan_schema import ExperimentPlan
+from halo.schema.plan_schema import ExperimentPlan
 
 
 def load_plan(path: Path) -> ExperimentPlan:

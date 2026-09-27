@@ -7,8 +7,8 @@ from pathlib import Path
 import yaml
 from pydantic import TypeAdapter
 
-from bas_har.config import activities_dir
-from bas_har.schema.activity_schema import ActivityId, ActivityManifest
+from halo.config import activities_dir
+from halo.schema.activity_schema import ActivityId, ActivityManifest
 
 
 class ActivityRegistry:

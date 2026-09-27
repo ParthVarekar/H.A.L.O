@@ -36,17 +36,17 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 
-from bas_har.perception.types import PerceptionResult
-from bas_har.procedure.alerts import AlertCandidate, Alerter
-from bas_har.procedure.events import JsonlEventSink, make_utc_now
-from bas_har.procedure.evidence import EvidenceAccumulator, EvidenceVerdict, rule_summary
-from bas_har.procedure.smoothing import (
+from halo.perception.types import PerceptionResult
+from halo.procedure.alerts import AlertCandidate, Alerter
+from halo.procedure.events import JsonlEventSink, make_utc_now
+from halo.procedure.evidence import EvidenceAccumulator, EvidenceVerdict, rule_summary
+from halo.procedure.smoothing import (
     PauseWatchdog,
     RecentEvents,
     StepSmoother,
 )
-from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
-from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, StepSpec
+from halo.schema.event_schema import AlertCode, EventRecord, StepStatus
+from halo.schema.plan_schema import EvidenceRule, ExperimentPlan, StepSpec
 
 PAUSE_DURATION_MARGIN = 1.5
 SKIP_CONFIRM_S = 1.5

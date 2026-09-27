@@ -6,12 +6,12 @@ from pathlib import Path
 
 import yaml
 
-from bas_har.schema.activity_schema import (
+from halo.schema.activity_schema import (
     ActivityId,
     DatasetQualityReport,
 )
-from bas_har.studio.datasets import activity_dataset_dir, load_dataset_version
-from bas_har.studio.registry import ActivityRegistry
+from halo.studio.datasets import activity_dataset_dir, load_dataset_version
+from halo.studio.registry import ActivityRegistry
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 SPLITS = ("train", "val", "test")

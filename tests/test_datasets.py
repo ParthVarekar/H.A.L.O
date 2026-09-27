@@ -8,13 +8,13 @@ import cv2
 import numpy as np
 import pytest
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.schema.plan_schema import ExperimentPlan
-from bas_har.studio.annotations import save_annotation
-from bas_har.studio.datasets import ensure_dataset_config, prepare_activity_dataset
-from bas_har.studio.plans import save_activity_plan
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import register_take
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.schema.plan_schema import ExperimentPlan
+from halo.studio.annotations import save_annotation
+from halo.studio.datasets import ensure_dataset_config, prepare_activity_dataset
+from halo.studio.plans import save_activity_plan
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import register_take
 
 
 def test_ensure_dataset_config_uses_plan_classes(tmp_path: Path) -> None:

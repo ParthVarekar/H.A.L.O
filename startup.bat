@@ -4,12 +4,12 @@ cd /d "%~dp0"
 
 set "PYTHON=%CD%\.venv\Scripts\python.exe"
 set "PLAN=%CD%\experiments\red_blue_box\experiment_plan.yaml"
-set "YOLO_MODEL=%BAS_HAR_MODEL%"
+set "YOLO_MODEL=%HALO_MODEL%"
 if not defined YOLO_MODEL set "YOLO_MODEL=models\yolo11n.pt"
-set "HOST=%BAS_HAR_HOST%"
+set "HOST=%HALO_HOST%"
 if not defined HOST set "HOST=127.0.0.1"
 set "STREAM_ARGS="
-if defined BAS_HAR_STREAM_TO set "STREAM_ARGS=--stream-to %BAS_HAR_STREAM_TO%"
+if defined HALO_STREAM_TO set "STREAM_ARGS=--stream-to %HALO_STREAM_TO%"
 set "WEB_INDEX=%CD%\web\dist\index.html"
 set "VIDEO=%USERPROFILE%\Downloads\on cell.mp4"
 if not exist "%VIDEO%" set "VIDEO="
@@ -43,12 +43,12 @@ goto web_video
 call :checks
 if errorlevel 1 goto checks_failed
 echo.
-echo All BAS-HAR checks passed.
+echo All H.A.L.O. checks passed.
 exit /b 0
 
 :verify_run
 echo.
-"%PYTHON%" -m bas_har verify
+"%PYTHON%" -m halo verify
 exit /b %ERRORLEVEL%
 
 :prepare_training
@@ -81,7 +81,7 @@ if defined REQUESTED_VIDEO set "VIDEO=%REQUESTED_VIDEO%"
 if not defined VIDEO goto missing_video
 if not exist "%VIDEO%" goto missing_video
 echo.
-echo Analyzing BAS-HAR sequence: %VIDEO%
+echo Analyzing H.A.L.O. sequence: %VIDEO%
 "%PYTHON%" -m scripts.analyze_sequence "%PLAN%" "%VIDEO%" --device auto --yolo-model "%YOLO_MODEL%" --require-complete
 exit /b %ERRORLEVEL%
 
@@ -95,8 +95,8 @@ goto web_video_start
 set "SOURCE=%~2"
 if not defined SOURCE set "SOURCE=0"
 echo.
-echo Starting BAS-HAR React dashboard on source %SOURCE%...
-start "BAS-HAR web" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --source "%SOURCE%" --yolo-model "%YOLO_MODEL%" --host %HOST% --port 5767 %STREAM_ARGS% --open-browser
+echo Starting H.A.L.O. React dashboard on source %SOURCE%...
+start "H.A.L.O. web" /b "%PYTHON%" -m halo.web.server --plan "%PLAN%" --source "%SOURCE%" --yolo-model "%YOLO_MODEL%" --host %HOST% --port 5767 %STREAM_ARGS% --open-browser
 if errorlevel 1 exit /b %ERRORLEVEL%
 echo Dashboard: http://%HOST%:5767
 exit /b 0
@@ -107,7 +107,7 @@ if defined REQUESTED_VIDEO set "VIDEO=%REQUESTED_VIDEO%"
 if not defined VIDEO goto missing_video
 if not exist "%VIDEO%" goto missing_video
 echo.
-echo Testing BAS-HAR with video: %VIDEO%
+echo Testing H.A.L.O. with video: %VIDEO%
 "%PYTHON%" -m scripts.run_engine "%PLAN%" "%VIDEO%" --yolo-model "%YOLO_MODEL%" --max-frames 60
 set "EXIT_CODE=%ERRORLEVEL%"
 if not "%EXIT_CODE%"=="0" echo Video test exited with code %EXIT_CODE%.
@@ -120,8 +120,8 @@ if defined REQUESTED_VIDEO set "VIDEO=%REQUESTED_VIDEO%"
 if not defined VIDEO goto missing_video
 if not exist "%VIDEO%" goto missing_video
 echo.
-echo Starting BAS-HAR React dashboard with video: %VIDEO%
-start "BAS-HAR web" /b "%PYTHON%" -m bas_har.web.server --plan "%PLAN%" --source "%VIDEO%" --yolo-model "%YOLO_MODEL%" --host %HOST% --port 5767 %STREAM_ARGS% --open-browser
+echo Starting H.A.L.O. React dashboard with video: %VIDEO%
+start "H.A.L.O. web" /b "%PYTHON%" -m halo.web.server --plan "%PLAN%" --source "%VIDEO%" --yolo-model "%YOLO_MODEL%" --host %HOST% --port 5767 %STREAM_ARGS% --open-browser
 if errorlevel 1 exit /b %ERRORLEVEL%
 echo Dashboard: http://%HOST%:5767
 exit /b 0
@@ -140,7 +140,7 @@ echo Checking Ruff formatting...
 if errorlevel 1 exit /b 1
 
 echo Validating the demo plan...
-"%PYTHON%" -m bas_har.schema.cli "%PLAN%" --quiet
+"%PYTHON%" -m halo.schema.cli "%PLAN%" --quiet
 if errorlevel 1 exit /b 1
 
 call :ensure_web_build
@@ -207,6 +207,6 @@ echo   startup.bat live         Start the React dashboard with webcam 0.
 echo   startup.bat live 1       Start the React dashboard with webcam 1.
 echo   startup.bat live FILE    Start the React dashboard with an MP4 or RTSP source.
 echo.
-echo   set BAS_HAR_STREAM_TO=udp://192.168.1.20:5000   also stream the video to that computer (VLC: udp://@:5000)
-echo   set BAS_HAR_HOST=0.0.0.0                        let other computers on the network open the dashboard
+echo   set HALO_STREAM_TO=udp://192.168.1.20:5000   also stream the video to that computer (VLC: udp://@:5000)
+echo   set HALO_HOST=0.0.0.0                        let other computers on the network open the dashboard
 exit /b 0

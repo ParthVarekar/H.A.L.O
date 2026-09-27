@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from bas_har.web.server import main as web_main
+from halo.web.server import main as web_main
 
 
 def main(argv: list[str] | None = None) -> int:

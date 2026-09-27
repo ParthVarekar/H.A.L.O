@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pytest
 
-from bas_har.web.frame_encoder import FrameEncoder
+from halo.web.frame_encoder import FrameEncoder
 
 
 def _frame() -> np.ndarray:

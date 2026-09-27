@@ -4,7 +4,7 @@ from ipaddress import IPv4Address, IPv6Address
 
 from pydantic import Field, IPvAnyAddress
 
-from bas_har.schema.plan_schema import StrictModel
+from halo.schema.plan_schema import StrictModel
 
 STREAM_URL_PREFIX = "udp://"
 

@@ -9,16 +9,16 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter
 
-from bas_har.config import project_root
-from bas_har.schema.activity_schema import (
+from halo.config import project_root
+from halo.schema.activity_schema import (
     ActivityId,
     ActivityLifecycle,
     ModelRelease,
     RecordId,
     ReleaseStatus,
 )
-from bas_har.studio.evaluation import load_evaluation_report
-from bas_har.studio.registry import ActivityRegistry
+from halo.studio.evaluation import load_evaluation_report
+from halo.studio.registry import ActivityRegistry
 
 
 def create_candidate(

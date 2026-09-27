@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bas_har.voice import ConfirmationSound, TtsEngine
+from halo.voice import ConfirmationSound, TtsEngine
 
 
 def test_tts_shutdown_stops_worker_thread() -> None:

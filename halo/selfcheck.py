@@ -10,15 +10,15 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from bas_har.config import activities_dir, experiments_dir, keys_dir
-from bas_har.io.signed_log import (
+from halo.config import activities_dir, experiments_dir, keys_dir
+from halo.io.signed_log import (
     PUBLIC_KEY_NAME,
     load_public_key,
     verify_downlink,
     verify_signed_log,
 )
-from bas_har.schema.cli import load_plan
-from bas_har.schema.selfcheck_schema import CheckResult, SelfCheckReport
+from halo.schema.cli import load_plan
+from halo.schema.selfcheck_schema import CheckResult, SelfCheckReport
 
 REFERENCE_ACTIVITY = "cold_stowage_melfi"
 REFERENCE_TAKE = "takes/slawosz_using_melfi-8821822197.mp4"
@@ -53,7 +53,7 @@ def run_reference_session(
     timeout_s: float = 900.0,
 ) -> dict:
     """Run the take through the same session runner the dashboard uses and return its final status."""
-    from bas_har.web.server import SessionRunner, WebState
+    from halo.web.server import SessionRunner, WebState
 
     plan = load_plan(activity_dir / "plan.yaml")
     state = WebState(plan)

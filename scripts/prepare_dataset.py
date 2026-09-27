@@ -11,8 +11,8 @@ from typing import Any, TypeVar
 import cv2
 import yaml
 
-from bas_har.config import datasets_dir
-from bas_har.perception import ColorBlockDetector
+from halo.config import datasets_dir
+from halo.perception import ColorBlockDetector
 
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}

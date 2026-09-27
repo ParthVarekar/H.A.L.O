@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.io_schema import CircularBufferConfig, CrcJsonlEntry
+from halo.schema.io_schema import CircularBufferConfig, CrcJsonlEntry
 
 
 def test_circular_buffer_config_valid() -> None:

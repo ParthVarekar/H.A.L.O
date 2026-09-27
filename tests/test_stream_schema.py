@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.stream_schema import StreamOutputSettings, StreamOutputStatus
+from halo.schema.stream_schema import StreamOutputSettings, StreamOutputStatus
 
 
 def test_stream_output_settings_minimal_valid() -> None:

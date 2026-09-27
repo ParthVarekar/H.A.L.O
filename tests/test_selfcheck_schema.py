@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.selfcheck_schema import CheckResult, SelfCheckReport
+from halo.schema.selfcheck_schema import CheckResult, SelfCheckReport
 
 
 def test_check_result_minimal_valid() -> None:

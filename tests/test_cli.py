@@ -1,4 +1,4 @@
-"""Tests for bas_har.schema.cli (the `validate-plan` command)."""
+"""Tests for halo.schema.cli (the `validate-plan` command)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from bas_har.schema.cli import main, validate_path
+from halo.schema.cli import main, validate_path
 
 
 def _write_plan(tmp_path: Path, body: str) -> Path:

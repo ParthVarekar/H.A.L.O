@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 
-from bas_har.config import project_root
-from bas_har.perception.detector import ObjectDetector
-from bas_har.perception.types import BBox, Detection
+from halo.config import project_root
+from halo.perception.detector import ObjectDetector
+from halo.perception.types import BBox, Detection
 
 DEFAULT_WEIGHTS = "yoloe-11s-seg.pt"
 TEXT_ENCODER = "mobileclip_blt.ts"

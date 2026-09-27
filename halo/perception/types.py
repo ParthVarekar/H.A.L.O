@@ -47,7 +47,7 @@ class PoseKeypoints:
     score: float
 
     def by_name(self, name: str) -> tuple[float, float, float]:
-        from bas_har.perception.pose import MEDIAPIPE_POSE_LANDMARK_NAMES
+        from halo.perception.pose import MEDIAPIPE_POSE_LANDMARK_NAMES
 
         if name not in MEDIAPIPE_POSE_LANDMARK_NAMES:
             raise KeyError(f"unknown pose landmark: {name}")

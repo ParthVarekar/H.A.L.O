@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest, JobStatus
-from bas_har.studio.jobs import DatasetJobManager, TrainingJobManager
-from bas_har.studio.registry import ActivityRegistry
+from halo.schema.activity_schema import ActivityKind, ActivityManifest, JobStatus
+from halo.studio.jobs import DatasetJobManager, TrainingJobManager
+from halo.studio.registry import ActivityRegistry
 
 
 def _registry(tmp_path: Path) -> ActivityRegistry:

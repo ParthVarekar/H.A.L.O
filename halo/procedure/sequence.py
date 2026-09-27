@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 
-from bas_har.perception.types import Detection, PerceptionResult
-from bas_har.schema.event_schema import EventRecord, StepStatus
-from bas_har.schema.plan_schema import ExperimentPlan, StepSpec
+from halo.perception.types import Detection, PerceptionResult
+from halo.schema.event_schema import EventRecord, StepStatus
+from halo.schema.plan_schema import ExperimentPlan, StepSpec
 
 
 @dataclass(slots=True)

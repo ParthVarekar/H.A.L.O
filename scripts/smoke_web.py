@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from bas_har.config import project_root
-from bas_har.schema.cli import load_plan
-from bas_har.web.server import STATIC_DIR, _plan_summary
+from halo.config import project_root
+from halo.schema.cli import load_plan
+from halo.web.server import STATIC_DIR, _plan_summary
 
 
 def main() -> int:

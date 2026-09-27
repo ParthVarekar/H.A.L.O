@@ -9,15 +9,15 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from bas_har.perception.types import PerceptionResult
-from bas_har.perception.vlm import (
+from halo.perception.types import PerceptionResult
+from halo.perception.vlm import (
     AsyncVisualQuestioner,
     build_prompt,
     filled_answer,
     load_cached_first,
 )
-from bas_har.procedure.evidence import EvidenceAccumulator, question_verdict
-from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
+from halo.procedure.evidence import EvidenceAccumulator, question_verdict
+from halo.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
 
 QUESTION = "Is a long cylindrical tray pulled out of the freezer?"
 OTHER = "Is one of the round freezer doors open?"
@@ -161,7 +161,7 @@ def test_async_questioner_answers_the_newest_frame_without_blocking() -> None:
         assert 10 in answerer.seen or answerer.seen[-1] > 1
     finally:
         questioner.close()
-    assert not any(thread.name == "bas-har-vlm" for thread in threading.enumerate())
+    assert not any(thread.name == "halo-vlm" for thread in threading.enumerate())
 
 
 def test_async_questioner_survives_a_failing_model() -> None:
@@ -179,7 +179,7 @@ def test_async_questioner_survives_a_failing_model() -> None:
 
 
 def test_recognition_mode_names_what_is_running() -> None:
-    from bas_har.web.server import _recognition_mode
+    from halo.web.server import _recognition_mode
 
     assert _recognition_mode(zero_shot=True, has_questions=True) == "zero_shot"
     assert _recognition_mode(zero_shot=False, has_questions=True) == "hybrid"
@@ -219,7 +219,7 @@ def test_expect_no_matches_a_negative_answer() -> None:
 
 
 def test_a_questions_only_plan_needs_no_detector() -> None:
-    from bas_har.procedure.evidence import detections_needed
+    from halo.procedure.evidence import detections_needed
 
     def plan_with(rule: dict) -> ExperimentPlan:
         return ExperimentPlan.model_validate(
@@ -236,7 +236,7 @@ def test_a_questions_only_plan_needs_no_detector() -> None:
 
 
 def test_pipeline_without_a_detector_still_asks_questions() -> None:
-    from bas_har.perception.pipeline import PerceptionPipeline
+    from halo.perception.pipeline import PerceptionPipeline
 
     class _Questioner:
         def submit(self, frame_bgr) -> None:

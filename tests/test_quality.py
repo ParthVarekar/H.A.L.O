@@ -7,12 +7,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest, DatasetVersion
-from bas_har.schema.plan_schema import ExperimentPlan
-from bas_har.studio.datasets import ensure_dataset_config
-from bas_har.studio.plans import save_activity_plan
-from bas_har.studio.quality import inspect_dataset, load_quality_report
-from bas_har.studio.registry import ActivityRegistry
+from halo.schema.activity_schema import ActivityKind, ActivityManifest, DatasetVersion
+from halo.schema.plan_schema import ExperimentPlan
+from halo.studio.datasets import ensure_dataset_config
+from halo.studio.plans import save_activity_plan
+from halo.studio.quality import inspect_dataset, load_quality_report
+from halo.studio.registry import ActivityRegistry
 
 
 def _image(path: Path) -> None:

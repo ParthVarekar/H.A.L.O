@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.activity_schema import (
+from halo.schema.activity_schema import (
     ActivityKind,
     ActivityLifecycle,
     ActivityManifest,

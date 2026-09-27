@@ -8,11 +8,11 @@ from typing import Any
 
 import yaml
 
-from bas_har.schema.activity_schema import ActivityId, AnnotationKind, DatasetVersion
-from bas_har.schema.plan_schema import state_class
-from bas_har.studio.annotations import list_annotations
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import list_takes
+from halo.schema.activity_schema import ActivityId, AnnotationKind, DatasetVersion
+from halo.schema.plan_schema import state_class
+from halo.studio.annotations import list_annotations
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import list_takes
 
 
 def activity_dataset_dir(
@@ -31,7 +31,7 @@ def ensure_dataset_config(
     plan_path = registry.package_dir(manifest.activity_id) / manifest.plan_path
     if not plan_path.is_file():
         raise FileNotFoundError(f"activity plan not found: {plan_path}")
-    from bas_har.studio.plans import load_activity_plan
+    from halo.studio.plans import load_activity_plan
 
     plan = load_activity_plan(registry, manifest.activity_id)
     class_names = plan.detector_classes()
@@ -141,7 +141,7 @@ def _apply_visual_annotations(
     if not annotations:
         return
     manifest = registry.load(activity_id)
-    from bas_har.studio.plans import load_activity_plan
+    from halo.studio.plans import load_activity_plan
 
     class_states = load_activity_plan(registry, manifest.activity_id).class_states()
     takes = {take.take_id: take for take in list_takes(registry, activity_id)}

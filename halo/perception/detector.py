@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from bas_har.perception.types import BBox, Detection
+from halo.perception.types import BBox, Detection
 
 
 class ObjectDetector:

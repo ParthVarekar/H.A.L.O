@@ -30,11 +30,11 @@ Cross-cutters:
 
 ## Phase 2 deliverable (this commit)
 
-- `bas_har/procedure/evidence.py` — `EvidenceAccumulator`; per-rule consecutive-match counting.
-- `bas_har/procedure/smoothing.py` — `StepSmoother` (EMA + transition cooldown), `PauseWatchdog`, `RateLimiter`, `SilenceWindow`, `RecentEvents`.
-- `bas_har/procedure/alerts.py` — `Alerter` with two-stage filter (confidence + persistence), rate limit, silence window, listener hook.
-- `bas_har/procedure/events.py` — `JsonlEventSink` (atomic-rename on close).
-- `bas_har/procedure/engine.py` — `ProcedureEngine` FSM; consumes `PerceptionResult`, emits `EventRecord` via the sink. Has `silence()`, `close()`, and an `EngineOutput` summary.
+- `halo/procedure/evidence.py` — `EvidenceAccumulator`; per-rule consecutive-match counting.
+- `halo/procedure/smoothing.py` — `StepSmoother` (EMA + transition cooldown), `PauseWatchdog`, `RateLimiter`, `SilenceWindow`, `RecentEvents`.
+- `halo/procedure/alerts.py` — `Alerter` with two-stage filter (confidence + persistence), rate limit, silence window, listener hook.
+- `halo/procedure/events.py` — `JsonlEventSink` (atomic-rename on close).
+- `halo/procedure/engine.py` — `ProcedureEngine` FSM; consumes `PerceptionResult`, emits `EventRecord` via the sink. Has `silence()`, `close()`, and an `EngineOutput` summary.
 - `scripts/replay_motor.py` — `replay-motor` CLI; DSL script (`grasp:obj x30`, `wait:5`, `silence`) feeds mocked `PerceptionResult`s through the engine.
 - `scripts/run_engine.py` — `run-engine` CLI; real MP4/webcam + real `PerceptionPipeline` + real engine. Hot path.
 - `scripts/samples/red_blue_box_golden.txt`, `scripts/samples/red_blue_box_skip.txt` — sample scripts.
@@ -51,12 +51,12 @@ Cross-cutters:
 
 ## Phase 1 deliverable (this commit)
 
-- `bas_har/perception/types.py` — `PerceptionResult`, `Detection`, `PoseKeypoints`, `HandKeypoints`, `HandObjectInteraction`, `BBox` dataclasses; JSON-serialisable.
-- `bas_har/perception/detector.py` — YOLOv11-n wrapper; auto-picks `models/yolo11n.pt` if present, else downloads.
-- `bas_har/perception/pose.py` — MediaPipe Pose Landmarker (33 keypoints).
-- `bas_har/perception/hands.py` — MediaPipe Hands (21 keypoints/hand).
-- `bas_har/perception/hoi.py` — proximity + velocity heuristic for HOI labels.
-- `bas_har/perception/pipeline.py` — composes the four above per frame.
+- `halo/perception/types.py` — `PerceptionResult`, `Detection`, `PoseKeypoints`, `HandKeypoints`, `HandObjectInteraction`, `BBox` dataclasses; JSON-serialisable.
+- `halo/perception/detector.py` — YOLOv11-n wrapper; auto-picks `models/yolo11n.pt` if present, else downloads.
+- `halo/perception/pose.py` — MediaPipe Pose Landmarker (33 keypoints).
+- `halo/perception/hands.py` — MediaPipe Hands (21 keypoints/hand).
+- `halo/perception/hoi.py` — proximity + velocity heuristic for HOI labels.
+- `halo/perception/pipeline.py` — composes the four above per frame.
 - `scripts/record_dataset.py` — tiny recorder; webcam OR MP4 file input, auto-numbered takes, sidecar `session.json`. Replay-friendly.
 - `scripts/prepare_dataset.py` — samples a folder of takes into video-level YOLO splits and a JSONL frame manifest, with optional color proposals.
 - `scripts/annotate_dataset.py` — local OpenCV drag-box labeler for completing and correcting YOLO labels.
@@ -78,10 +78,10 @@ Running `smoke_perception.py` on the demo video (`Man_sorting_blocks_in_box_2026
 Conclusion: pipeline wiring works end-to-end; next step is **recording real takes**
 of the red/blue box experiment to fine-tune the detector.
 
-- `bas_har/schema/plan_schema.py` — Pydantic models for `experiment_plan.yaml`.
-- `bas_har/schema/event_schema.py` — Pydantic models for the JSONL event log.
-- `bas_har/schema/cli.py` — `validate-plan` command. Loads, lints, summarises.
-- `bas_har/config.py` — runtime paths and env.
+- `halo/schema/plan_schema.py` — Pydantic models for `experiment_plan.yaml`.
+- `halo/schema/event_schema.py` — Pydantic models for the JSONL event log.
+- `halo/schema/cli.py` — `validate-plan` command. Loads, lints, summarises.
+- `halo/config.py` — runtime paths and env.
 - `experiments/red_blue_box/experiment_plan.yaml` — the demo plan.
 - `experiments/red_blue_box/notes.md` — recording protocol.
 + `tests/` — 115 tests currently covering schema, procedure, web, studio, IO, capture, voice, and activity-package behavior.
@@ -151,10 +151,10 @@ and a detector (yolo11n, no horizontal flip) is trained and installed.
 Two schema additions came from this work, both explicitly approved by the owner:
 
 - **Per-object states** (`ObjectSpec.states`) expand a class into per-state detector classes
-  (`state_class`/`base_class` in `bas_har/schema/plan_schema.py`), so a hatch, tray, or latch can
+  (`state_class`/`base_class` in `halo/schema/plan_schema.py`), so a hatch, tray, or latch can
   be boxed and checked as open/closed, in/out, or left/right without inventing a parallel schema.
 - **`inside_of`** on `EvidenceRule` mirrors the existing `outside_of`, so a step can require one
-  detection mostly inside another (`INSIDE_MIN_FRACTION = 0.8` in `bas_har/procedure/evidence.py`),
+  detection mostly inside another (`INSIDE_MIN_FRACTION = 0.8` in `halo/procedure/evidence.py`),
   used for "the sample is inside the open compartment".
 
 Testing the checker against the real video (not just unit tests) surfaced two engine bugs that are

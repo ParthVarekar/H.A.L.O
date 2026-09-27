@@ -154,7 +154,8 @@ export function LogoScene() {
           })}
           <Logo size={150} draw={draw} />
         </div>
-        <Words text="BAS-HAR" delay={16} size={110} style={{ letterSpacing: "-0.04em" }} />
+        <Words text="H.A.L.O." delay={16} size={110} style={{ letterSpacing: "-0.02em" }} />
+        <Words text="Human Activity Logging in Orbit" delay={22} size={26} stagger={2} style={{ fontFamily: font.mono, fontWeight: 500, color: color.accent, letterSpacing: "0.04em" }} />
         <Words text="Watches each step of an experiment as it happens." delay={26} size={40} stagger={2} style={{ fontFamily: font.text, fontWeight: 400, color: color.text2, letterSpacing: "-0.01em" }} />
       </AbsoluteFill>
     </Push>
@@ -620,7 +621,8 @@ export function CloseScene() {
         <div style={{ transform: `scale(${pop})` }}>
           <Logo size={112} draw={interpolate(frame, [0, 22], [0, 1], clamp)} />
         </div>
-        <Words text="BAS-HAR" delay={8} size={92} style={{ letterSpacing: "-0.04em" }} />
+        <Words text="H.A.L.O." delay={8} size={92} style={{ letterSpacing: "-0.02em" }} />
+        <Words text="Human Activity Logging in Orbit" delay={13} size={24} stagger={2} style={{ fontFamily: font.mono, fontWeight: 500, color: color.accent, letterSpacing: "0.04em" }} />
         <Words text="Built for Bharatiya Antariksh Station." delay={18} size={36} stagger={2} style={{ fontFamily: font.text, fontWeight: 400, color: color.text2, letterSpacing: "-0.005em" }} />
       </AbsoluteFill>
     </Push>

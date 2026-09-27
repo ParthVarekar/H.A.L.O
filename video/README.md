@@ -1,4 +1,4 @@
-# BAS-HAR videos
+# H.A.L.O. videos
 
 Two Remotion compositions live here. `Intro` is the long project intro; `Launch` is a
 sub-10-second product launch cut.
@@ -22,7 +22,7 @@ Three acts, one idea each.
 | Frames | Act | What happens |
 |---|---|---|
 | 0–86 | The problem | A cold, desaturated zero-g void. The MELFI dewar's hatch swings open, tray 2 slides out, an amber alert fires. *"In orbit, a missed step is gone forever."* |
-| 86–200 | The solution | A white flash, the world warms and saturates, a scan ring sweeps out, nine detection chips tumble in from off-screen and settle into an orbit, the alert flips green. *"BAS-HAR follows every step."* → *"And speaks the moment one is missed."* |
+| 86–200 | The solution | A white flash, the world warms and saturates, a scan ring sweeps out, nine detection chips tumble in from off-screen and settle into an orbit, the alert flips green. *"H.A.L.O. follows every step."* → *"And speaks the moment one is missed."* |
 | 200–288 | The mark | The world rushes the camera and dissolves. The mark draws, the wordmark sets letter by letter, the tagline lands. |
 
 Everything in the cut is real: the object names, states and step numbers are the plan's

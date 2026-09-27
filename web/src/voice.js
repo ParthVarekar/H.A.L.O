@@ -1,4 +1,4 @@
-const OWNER_KEY = "bas-har-voice-owner";
+const OWNER_KEY = "halo-voice-owner";
 const OWNER_STALE_MS = 3000;
 const HEARTBEAT_MS = 1000;
 const WATCHDOG_BASE_MS = 2500;

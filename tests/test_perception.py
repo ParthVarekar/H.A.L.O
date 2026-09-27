@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from bas_har.perception.hoi import HandObjectInteractionTagger, bbox_within
-from bas_har.perception.types import (
+from halo.perception.hoi import HandObjectInteractionTagger, bbox_within
+from halo.perception.types import (
     BBox,
     Detection,
     HandKeypoints,
@@ -115,7 +115,7 @@ def test_pose_keypoints_by_name_unknown() -> None:
     reason="models/yolo11n.pt not present (run smoke_perception.py once to download)",
 )
 def test_object_detector_loads() -> None:
-    from bas_har.perception import ObjectDetector
+    from halo.perception import ObjectDetector
 
     det = ObjectDetector(model_path="models/yolo11n.pt")
     names = det.class_names

@@ -14,11 +14,11 @@ from typing import Protocol
 
 import numpy as np
 
-from bas_har.config import project_root
-from bas_har.schema.activity_schema import ActivityId, ActivityManifest
-from bas_har.schema.recognition_schema import ActivityRecognition, ActivityRecognitionScore
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import list_takes
+from halo.config import project_root
+from halo.schema.activity_schema import ActivityId, ActivityManifest
+from halo.schema.recognition_schema import ActivityRecognition, ActivityRecognitionScore
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import list_takes
 
 DETECTOR_FILENAME = "detector.pt"
 REFERENCE_FRAMES_PER_TAKE = 32
@@ -42,7 +42,7 @@ class YoloBackboneEmbedder:
     ) -> None:
         from ultralytics import YOLO
 
-        from bas_har.perception.detector import ObjectDetector
+        from halo.perception.detector import ObjectDetector
 
         self._model = YOLO(str(model_path or project_root() / "models" / "yolo11n.pt"))
         self._device = ObjectDetector.resolve_device(device)

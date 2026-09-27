@@ -21,8 +21,8 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter, ValidationError
 
-from bas_har.config import keys_dir, logs_dir, project_root
-from bas_har.procedure import (
+from halo.config import keys_dir, logs_dir, project_root
+from halo.procedure import (
     ColorSequenceTracker,
     ProcedureEngine,
     build_engine,
@@ -30,7 +30,7 @@ from bas_har.procedure import (
     perception_needs,
     question_verdict,
 )
-from bas_har.schema.activity_schema import (
+from halo.schema.activity_schema import (
     ActivityId,
     ActivityLifecycle,
     ActivityManifest,
@@ -39,38 +39,38 @@ from bas_har.schema.activity_schema import (
     ReleaseStatus,
     TrainingPreset,
 )
-from bas_har.schema.cli import load_plan
-from bas_har.schema.display_schema import DisplaySettings
-from bas_har.schema.event_schema import EventRecord
-from bas_har.schema.plan_schema import ExperimentPlan
-from bas_har.schema.recognition_schema import ActivityRecognition
-from bas_har.schema.stream_schema import StreamOutputSettings
-from bas_har.studio.annotations import (
+from halo.schema.cli import load_plan
+from halo.schema.display_schema import DisplaySettings
+from halo.schema.event_schema import EventRecord
+from halo.schema.plan_schema import ExperimentPlan
+from halo.schema.recognition_schema import ActivityRecognition
+from halo.schema.stream_schema import StreamOutputSettings
+from halo.studio.annotations import (
     delete_annotation,
     list_annotations,
     list_keyframes,
     read_take_frame,
     save_annotation,
 )
-from bas_har.studio.datasets import activity_dataset_dir, load_dataset_version
-from bas_har.studio.evaluation import EvaluationJobManager, evaluation_csv, load_evaluation_report
-from bas_har.studio.hardware import hardware_snapshot
-from bas_har.studio.jobs import DatasetJobManager, TrainingJobManager
-from bas_har.studio.plans import load_activity_plan, save_activity_plan
-from bas_har.studio.quality import inspect_dataset, load_quality_report
-from bas_har.studio.recognition import activity_detector_path, recognize_activity
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.releases import (
+from halo.studio.datasets import activity_dataset_dir, load_dataset_version
+from halo.studio.evaluation import EvaluationJobManager, evaluation_csv, load_evaluation_report
+from halo.studio.hardware import hardware_snapshot
+from halo.studio.jobs import DatasetJobManager, TrainingJobManager
+from halo.studio.plans import load_activity_plan, save_activity_plan
+from halo.studio.quality import inspect_dataset, load_quality_report
+from halo.studio.recognition import activity_detector_path, recognize_activity
+from halo.studio.registry import ActivityRegistry
+from halo.studio.releases import (
     activate_release,
     approve_release,
     create_candidate,
     list_releases,
 )
-from bas_har.studio.takes import list_takes, register_take
-from bas_har.studio.timeline import import_timeline, list_timeline
-from bas_har.studio.verification import release_audit_csv, verify_activity_package
-from bas_har.voice import ConfirmationSound
-from bas_har.web.frame_encoder import FrameEncoder
+from halo.studio.takes import list_takes, register_take
+from halo.studio.timeline import import_timeline, list_timeline
+from halo.studio.verification import release_audit_csv, verify_activity_package
+from halo.voice import ConfirmationSound
+from halo.web.frame_encoder import FrameEncoder
 
 STATIC_DIR = project_root() / "web" / "dist"
 mimetypes.add_type("font/woff2", ".woff2")
@@ -257,7 +257,7 @@ def _control_existing_dashboard(
     try:
         with urllib.request.urlopen(f"{base_url}/api/health", timeout=1) as response:
             health = json.loads(response.read().decode("utf-8"))
-        if not isinstance(health, dict) or health.get("service") != "bas-har-web":
+        if not isinstance(health, dict) or health.get("service") != "halo-web":
             return False
         _post_json(f"{base_url}/api/stop", {})
         payload: dict[str, Any] = {"source": source}
@@ -451,7 +451,7 @@ class WebState:
 
     def set_stream_out(self, settings: StreamOutputSettings) -> None:
         """Stop any running stream and start a new one to the configured address when enabled."""
-        from bas_har.io.stream_out import UdpStreamPublisher
+        from halo.io.stream_out import UdpStreamPublisher
 
         with self.lock:
             previous = self.publisher
@@ -641,7 +641,7 @@ class SessionRunner:
         self.engine: ProcedureEngine | None = None
         self.engine_lock = threading.Lock()
         self.timer = StageTimer()
-        self.thread = threading.Thread(target=self._run, name="bas-har-capture", daemon=True)
+        self.thread = threading.Thread(target=self._run, name="halo-capture", daemon=True)
 
     def start(self) -> None:
         self.thread.start()
@@ -682,8 +682,8 @@ class SessionRunner:
                 self.state.update(display_fps=round(shown / max(encoded_at - started, 0.001), 1))
 
     def _record(self, frames: queue.Queue[Any], buffer_dir: Path, fps: float) -> None:
-        from bas_har.io import Mp4CircularBuffer
-        from bas_har.schema.io_schema import CircularBufferConfig
+        from halo.io import Mp4CircularBuffer
+        from halo.schema.io_schema import CircularBufferConfig
 
         buffer: Any | None = None
         try:
@@ -728,7 +728,7 @@ class SessionRunner:
 
     def _write_downlink(self, sink: Any, buffer_dir: Path | None) -> None:
         """Seal the session in a signed, kilobyte-scale report and check it against the log."""
-        from bas_har.io.signed_log import build_downlink, verify_downlink, write_downlink
+        from halo.io.signed_log import build_downlink, verify_downlink, write_downlink
 
         try:
             source_bytes = self._source_bytes(buffer_dir)
@@ -756,7 +756,7 @@ class SessionRunner:
     def _build_questioner(self, questions: list[str]) -> Any | None:
         if not questions:
             return None
-        from bas_har.perception.vlm import AsyncVisualQuestioner, VisualQuestionAnswerer
+        from halo.perception.vlm import AsyncVisualQuestioner, VisualQuestionAnswerer
 
         self.state.update(message="Loading the vision-language model")
         answerer = VisualQuestionAnswerer(
@@ -766,9 +766,9 @@ class SessionRunner:
         return AsyncVisualQuestioner(answerer, questions)
 
     def _run(self) -> None:
-        from bas_har.io import VideoCaptureSource
-        from bas_har.io.signed_log import SignedJsonlEventSink, load_or_create_station_key
-        from bas_har.perception import PerceptionPipeline
+        from halo.io import VideoCaptureSource
+        from halo.io.signed_log import SignedJsonlEventSink, load_or_create_station_key
+        from halo.perception import PerceptionPipeline
 
         capture: Any | None = None
         sink: Any | None = None
@@ -825,7 +825,7 @@ class SessionRunner:
             self.state.update(message="Warming up the detector")
             pipeline.warmup(width, height)
             presenter = threading.Thread(
-                target=self._present, args=(slot, encoder), name="bas-har-present", daemon=True
+                target=self._present, args=(slot, encoder), name="halo-present", daemon=True
             )
             presenter.start()
             if self.record_buffer:
@@ -833,7 +833,7 @@ class SessionRunner:
                 recorder = threading.Thread(
                     target=self._record,
                     args=(recording, buffer_dir, fps),
-                    name="bas-har-record",
+                    name="halo-record",
                     daemon=True,
                 )
                 recorder.start()
@@ -1056,7 +1056,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/health":
-            self._send_json({"ok": True, "service": "bas-har-web"})
+            self._send_json({"ok": True, "service": "halo-web"})
             return
         if parsed.path == "/api/hardware":
             self._send_json(hardware_snapshot())

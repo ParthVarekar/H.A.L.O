@@ -13,9 +13,9 @@ demo is a config, not code.
 ## Hard rules
 
 1. **No comments unless asked.** Code should read like prose.
-2. **Schema-first.** Every feature starts with a Pydantic model in `bas_har/schema/` before any
-   logic in `bas_har/procedure/`, `bas_har/io/`, etc. The procedure engine in
-   `bas_har/procedure/` is generic over the schema; experiment-specific knowledge
+2. **Schema-first.** Every feature starts with a Pydantic model in `halo/schema/` before any
+   logic in `halo/procedure/`, `halo/io/`, etc. The procedure engine in
+   `halo/procedure/` is generic over the schema; experiment-specific knowledge
    lives only in YAML.
 3. **YAML is the only place experiment-specific knowledge lives.** No hard-coded step lists in
    Python. No hard-coded class names. If you find yourself writing `if step == "open box"`,
@@ -23,20 +23,20 @@ demo is a config, not code.
 4. **No ML dependencies in core.** `pyproject.toml` `dependencies` stays lean (pydantic,
    pyyaml, loguru, cryptography). `cryptography` is core because every event log is Ed25519-signed.
    ML deps live in the `perception` extra.
-5. **Tests are mandatory for every public function in `bas_har/`.** No `_` prefixes unless the
+5. **Tests are mandatory for every public function in `halo/`.** No `_` prefixes unless the
    function is a true private helper used in one place.
 6. **Python version pin is `<3.14`** in `pyproject.toml` because MediaPipe / PyTorch wheels
    lag. If you bump it, update `requires-python` and add a note here.
 7. **Single source of truth for paths.** Use `pathlib.Path`; never `os.path.join`.
-8. **One command per CLI.** `python -m bas_har` (subcommands `verify`, `verify-log`,
+8. **One command per CLI.** `python -m halo` (subcommands `verify`, `verify-log`,
    `verify-downlink`) and `validate-plan` are the only entry points for now. No
    `python scripts/foo.py`.
 
 ## Layout
 
 ```
-bas_har/
-  __main__.py        # python -m bas_har
+halo/
+  __main__.py        # python -m halo
   config.py          # runtime config (paths, env)
   schema/            # Pydantic models: plan_schema.py, event_schema.py, cli.py
   procedure/         # FSM engine, evidence, alerts (Phase 3)
@@ -49,7 +49,7 @@ datasets/            # recorded takes (gitignored)
 models/              # exported weights (gitignored)
 docs/                # architecture, SIH submission
 scripts/             # CLI utilities
-tests/               # pytest, mirrors bas_har/ structure
+tests/               # pytest, mirrors halo/ structure
 ```
 
 ## Style

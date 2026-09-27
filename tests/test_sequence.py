@@ -5,10 +5,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from bas_har.perception.color_blocks import ColorBlockDetector
-from bas_har.perception.types import BBox, Detection, PerceptionResult
-from bas_har.procedure.sequence import ColorSequenceTracker
-from bas_har.schema.cli import load_plan
+from halo.perception.color_blocks import ColorBlockDetector
+from halo.perception.types import BBox, Detection, PerceptionResult
+from halo.procedure.sequence import ColorSequenceTracker
+from halo.schema.cli import load_plan
 
 
 def _result(frame_id: int, *detections: Detection) -> PerceptionResult:

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.recognition_schema import ActivityRecognition, ActivityRecognitionScore
+from halo.schema.recognition_schema import ActivityRecognition, ActivityRecognitionScore
 
 MINIMAL = {
     "video": "take.mp4",

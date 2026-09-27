@@ -8,9 +8,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from bas_har.schema.activity_schema import ActivityId, TimelineRecord
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import list_takes
+from halo.schema.activity_schema import ActivityId, TimelineRecord
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import list_takes
 
 _TIME_PATTERN = re.compile(r"^(?P<hours>\d+):(?P<minutes>[0-5]\d):(?P<seconds>[0-5]\d(?:\.\d+)?)$")
 REQUIRED_COLUMNS = {

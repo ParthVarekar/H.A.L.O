@@ -32,8 +32,8 @@ import sys
 import time
 from pathlib import Path
 
-from bas_har.config import logs_dir
-from bas_har.perception.types import (
+from halo.config import logs_dir
+from halo.perception.types import (
     BBox,
     Detection,
     HandKeypoints,
@@ -41,8 +41,8 @@ from bas_har.perception.types import (
     PerceptionResult,
     PoseKeypoints,
 )
-from bas_har.procedure import build_engine
-from bas_har.schema.cli import load_plan
+from halo.procedure import build_engine
+from halo.schema.cli import load_plan
 
 
 def _plan_object_classes(plan) -> dict[str, list[str]]:

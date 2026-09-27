@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 import pytest
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.studio.recognition import (
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.studio.recognition import (
     activity_detector_path,
     activity_take_paths,
     normalize_rows,
@@ -13,8 +13,8 @@ from bas_har.studio.recognition import (
     sample_video_frames,
     vote_activities,
 )
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import register_take
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import register_take
 
 RED = (0, 0, 220)
 BLUE = (220, 0, 0)

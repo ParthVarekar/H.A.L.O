@@ -8,8 +8,8 @@ import re
 import shutil
 from pathlib import Path
 
-from bas_har.schema.activity_schema import ActivityId, RecordId, TakeRecord
-from bas_har.studio.registry import ActivityRegistry
+from halo.schema.activity_schema import ActivityId, RecordId, TakeRecord
+from halo.studio.registry import ActivityRegistry
 
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 

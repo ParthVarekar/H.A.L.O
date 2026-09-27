@@ -7,7 +7,7 @@ detector all ship with it, and the commands never touch the network.
 ## 1. Reproduce the reference run
 
 ```bash
-python -m bas_har verify
+python -m halo verify
 ```
 
 This runs the committed ESA Ignis take (`activities/cold_stowage_melfi/takes/`, 67 s) through the
@@ -35,7 +35,7 @@ longer.
 ## 2. Check a signed event log
 
 ```bash
-python -m bas_har verify-log logs/web_cold_stowage_melfi_<stamp>.jsonl
+python -m halo verify-log logs/web_cold_stowage_melfi_<stamp>.jsonl
 ```
 
 ```text
@@ -56,7 +56,7 @@ private key.
 ## 3. Check the downlink report
 
 ```bash
-python -m bas_har verify-downlink logs/web_cold_stowage_melfi_<stamp>.downlink.json --log logs/web_cold_stowage_melfi_<stamp>.jsonl
+python -m halo verify-downlink logs/web_cold_stowage_melfi_<stamp>.downlink.json --log logs/web_cold_stowage_melfi_<stamp>.jsonl
 ```
 
 ```text

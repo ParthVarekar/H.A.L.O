@@ -6,7 +6,7 @@
       "runtimeExecutable": "C:/Users/Parth/Desktop/HAR_for_BAS/.venv/Scripts/python.exe",
       "runtimeArgs": [
         "-m",
-        "bas_har.web.server",
+        "halo.web.server",
         "--plan",
         "C:/Users/Parth/Desktop/HAR_for_BAS/activities/cold_stowage_melfi/plan.yaml",
         "--yolo-model",

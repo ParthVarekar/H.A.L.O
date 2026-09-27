@@ -1,4 +1,4 @@
-"""Smoke test for bas_har.config helpers."""
+"""Smoke test for halo.config helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from bas_har import config
+from halo import config
 
 
 def test_project_root_is_dir() -> None:
@@ -31,7 +31,7 @@ def test_keys_dir_creates_on_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_default_camera_source_uses_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("BAS_HAR_CAMERA", "2")
+    monkeypatch.setenv("HALO_CAMERA", "2")
     assert config.default_camera_source() == 2
-    monkeypatch.delenv("BAS_HAR_CAMERA", raising=False)
+    monkeypatch.delenv("HALO_CAMERA", raising=False)
     assert config.default_camera_source() == 0

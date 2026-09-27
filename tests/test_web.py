@@ -8,12 +8,12 @@ import cv2
 import numpy as np
 import pytest
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.schema.cli import load_plan
-from bas_har.schema.recognition_schema import ActivityRecognition
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import register_take
-from bas_har.web.server import (
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.schema.cli import load_plan
+from halo.schema.recognition_schema import ActivityRecognition
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import register_take
+from halo.web.server import (
     DashboardServer,
     WebState,
     _plan_summary,
@@ -349,10 +349,10 @@ def test_analyze_rejects_unsupported_file_type(tmp_path: Path) -> None:
 
 
 def test_activity_run_mode_reports_trained_described_or_unavailable(tmp_path: Path) -> None:
-    from bas_har.schema.plan_schema import ExperimentPlan
-    from bas_har.studio.plans import save_activity_plan
-    from bas_har.studio.recognition import activity_detector_path
-    from bas_har.web.server import _activity_run_mode
+    from halo.schema.plan_schema import ExperimentPlan
+    from halo.studio.plans import save_activity_plan
+    from halo.studio.recognition import activity_detector_path
+    from halo.web.server import _activity_run_mode
 
     registry = ActivityRegistry(tmp_path)
     plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
@@ -374,7 +374,7 @@ def test_activity_run_mode_reports_trained_described_or_unavailable(tmp_path: Pa
 
 
 def test_display_toggle_redraws_the_still_frame_without_boxes() -> None:
-    from bas_har.perception.types import BBox, Detection, PerceptionResult
+    from halo.perception.types import BBox, Detection, PerceptionResult
 
     plan = load_plan(Path("experiments/red_blue_box/experiment_plan.yaml"))
     state = WebState(plan)
@@ -490,7 +490,7 @@ def test_stream_out_api_merges_settings_and_streams_frames() -> None:
 
 
 def test_downlink_endpoints_need_a_finished_session(tmp_path: Path) -> None:
-    from bas_har.io.signed_log import (
+    from halo.io.signed_log import (
         SignedJsonlEventSink,
         build_downlink,
         load_or_create_station_key,

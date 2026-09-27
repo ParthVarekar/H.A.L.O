@@ -11,18 +11,18 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter
 
-from bas_har.config import project_root
-from bas_har.schema.activity_schema import (
+from halo.config import project_root
+from halo.schema.activity_schema import (
     ActivityId,
     EvaluationJob,
     EvaluationReport,
     JobStatus,
     RecordId,
 )
-from bas_har.studio.datasets import activity_dataset_dir, load_dataset_version
-from bas_har.studio.hardware import hardware_snapshot
-from bas_har.studio.quality import inspect_dataset
-from bas_har.studio.registry import ActivityRegistry
+from halo.studio.datasets import activity_dataset_dir, load_dataset_version
+from halo.studio.hardware import hardware_snapshot
+from halo.studio.quality import inspect_dataset
+from halo.studio.registry import ActivityRegistry
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 Box = tuple[int, float, float, float, float]
@@ -204,7 +204,7 @@ class EvaluationJobManager:
         thread = threading.Thread(
             target=self._run,
             args=(job,),
-            name=f"bas-har-evaluate-{job.job_id}",
+            name=f"halo-evaluate-{job.job_id}",
             daemon=True,
         )
         thread.start()

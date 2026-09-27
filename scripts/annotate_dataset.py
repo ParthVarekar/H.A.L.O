@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 import yaml
 
-from bas_har.config import datasets_dir
+from halo.config import datasets_dir
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 CLASS_COLORS = [(50, 190, 255), (70, 70, 255), (255, 150, 50), (180, 80, 220)]
@@ -91,7 +91,7 @@ def annotate(dataset: Path, split: str, start: int, limit: int | None) -> int:
     if start < 0 or start >= len(images):
         raise ValueError(f"start must be between 0 and {len(images) - 1}")
     end = min(len(images), start + limit) if limit is not None else len(images)
-    window = "bas-har YOLO annotator"
+    window = "halo YOLO annotator"
     cv2.namedWindow(window, cv2.WINDOW_NORMAL)
     image_index = start
     try:

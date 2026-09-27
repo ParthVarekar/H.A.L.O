@@ -7,16 +7,16 @@ from pathlib import Path
 from typing import ClassVar
 from uuid import uuid4
 
-from bas_har.config import project_root
-from bas_har.schema.activity_schema import (
+from halo.config import project_root
+from halo.schema.activity_schema import (
     DatasetPreparationJob,
     JobStatus,
     TrainingJob,
     TrainingPreset,
 )
-from bas_har.studio.datasets import activity_dataset_dir, prepare_activity_dataset
-from bas_har.studio.hardware import hardware_snapshot
-from bas_har.studio.registry import ActivityRegistry
+from halo.studio.datasets import activity_dataset_dir, prepare_activity_dataset
+from halo.studio.hardware import hardware_snapshot
+from halo.studio.registry import ActivityRegistry
 
 
 class DatasetJobManager:
@@ -42,7 +42,7 @@ class DatasetJobManager:
         thread = threading.Thread(
             target=self._run,
             args=(job, sample_every, val_ratio, test_ratio),
-            name=f"bas-har-dataset-{job.job_id}",
+            name=f"halo-dataset-{job.job_id}",
             daemon=True,
         )
         thread.start()
@@ -156,7 +156,7 @@ class TrainingJobManager:
         thread = threading.Thread(
             target=self._run,
             args=(job, model_path),
-            name=f"bas-har-train-{job.job_id}",
+            name=f"halo-train-{job.job_id}",
             daemon=True,
         )
         thread.start()
@@ -198,7 +198,7 @@ class TrainingJobManager:
         )
         self._store(running)
         try:
-            from bas_har.studio.datasets import activity_dataset_dir, load_dataset_version
+            from halo.studio.datasets import activity_dataset_dir, load_dataset_version
             from scripts.train_yolo import _validate_dataset
 
             dataset_dir = activity_dataset_dir(self.registry, job.activity_id)

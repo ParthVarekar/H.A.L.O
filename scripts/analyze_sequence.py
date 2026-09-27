@@ -6,13 +6,13 @@ import argparse
 import time
 from pathlib import Path
 
-from bas_har.config import logs_dir
-from bas_har.io import CrcJsonlEventSink, VideoCaptureSource
-from bas_har.perception.pipeline import PerceptionPipeline
-from bas_har.procedure.sequence import ColorSequenceTracker, SequenceObservation
-from bas_har.schema.cli import load_plan
-from bas_har.schema.plan_schema import ExperimentPlan
-from bas_har.voice import ConfirmationSound
+from halo.config import logs_dir
+from halo.io import CrcJsonlEventSink, VideoCaptureSource
+from halo.perception.pipeline import PerceptionPipeline
+from halo.procedure.sequence import ColorSequenceTracker, SequenceObservation
+from halo.schema.cli import load_plan
+from halo.schema.plan_schema import ExperimentPlan
+from halo.voice import ConfirmationSound
 
 
 def _source_value(source: str) -> int | str:

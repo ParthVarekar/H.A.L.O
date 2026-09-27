@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.studio.registry import ActivityRegistry
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.studio.registry import ActivityRegistry
 
 
 def _manifest() -> ActivityManifest:

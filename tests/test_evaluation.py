@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest, JobStatus
-from bas_har.studio.evaluation import EvaluationJobManager, evaluate_boxes
-from bas_har.studio.registry import ActivityRegistry
+from halo.schema.activity_schema import ActivityKind, ActivityManifest, JobStatus
+from halo.studio.evaluation import EvaluationJobManager, evaluate_boxes
+from halo.studio.registry import ActivityRegistry
 
 
 def test_evaluate_boxes_matches_class_and_iou() -> None:

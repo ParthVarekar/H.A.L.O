@@ -8,11 +8,11 @@ import cv2
 import numpy as np
 import pytest
 
-from bas_har.io.capture import VideoCaptureSource, source_from_path
-from bas_har.io.circular_buffer import Mp4CircularBuffer
-from bas_har.io.crc_jsonl import CrcJsonlEventSink, CrcJsonlVerifier, CrcJsonlWriter
-from bas_har.schema.event_schema import EventRecord, StepStatus
-from bas_har.schema.io_schema import CircularBufferConfig
+from halo.io.capture import VideoCaptureSource, source_from_path
+from halo.io.circular_buffer import Mp4CircularBuffer
+from halo.io.crc_jsonl import CrcJsonlEventSink, CrcJsonlVerifier, CrcJsonlWriter
+from halo.schema.event_schema import EventRecord, StepStatus
+from halo.schema.io_schema import CircularBufferConfig
 
 
 class _FakeCapture:

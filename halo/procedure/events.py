@@ -10,7 +10,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-from bas_har.schema.event_schema import EventRecord
+from halo.schema.event_schema import EventRecord
 
 
 class JsonlEventSink:

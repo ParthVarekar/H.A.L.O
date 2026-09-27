@@ -7,7 +7,7 @@ from typing import Any
 
 import cv2
 
-from bas_har.schema.io_schema import CircularBufferConfig
+from halo.schema.io_schema import CircularBufferConfig
 
 
 class Mp4CircularBuffer:

@@ -1,4 +1,4 @@
-"""Tests for the one-command reproduction check and the `python -m bas_har` subcommands."""
+"""Tests for the one-command reproduction check and the `python -m halo` subcommands."""
 
 from __future__ import annotations
 
@@ -7,17 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from bas_har import __main__ as cli
-from bas_har import selfcheck
-from bas_har.io.signed_log import (
+from halo import __main__ as cli
+from halo import selfcheck
+from halo.io.signed_log import (
     SignedJsonlEventSink,
     build_downlink,
     load_or_create_station_key,
     write_downlink,
 )
-from bas_har.schema.cli import load_plan
-from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
-from bas_har.schema.selfcheck_schema import CheckResult, SelfCheckReport
+from halo.schema.cli import load_plan
+from halo.schema.event_schema import AlertCode, EventRecord, StepStatus
+from halo.schema.selfcheck_schema import CheckResult, SelfCheckReport
 
 PLAN = Path("experiments/red_blue_box/experiment_plan.yaml")
 

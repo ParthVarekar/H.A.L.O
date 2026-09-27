@@ -8,8 +8,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from bas_har.schema.event_schema import EventRecord
-from bas_har.schema.io_schema import CrcJsonlEntry
+from halo.schema.event_schema import EventRecord
+from halo.schema.io_schema import CrcJsonlEntry
 
 
 class CrcJsonlWriter:

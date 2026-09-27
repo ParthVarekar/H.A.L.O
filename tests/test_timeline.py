@@ -8,10 +8,10 @@ import cv2
 import numpy as np
 import pytest
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import list_takes, register_take
-from bas_har.studio.timeline import import_timeline, parse_time, read_timeline
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import list_takes, register_take
+from halo.studio.timeline import import_timeline, parse_time, read_timeline
 
 
 def _write_video(path: Path) -> None:

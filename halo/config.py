@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 def project_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).absolute().parent.parent
 
 
 def experiments_dir() -> Path:
@@ -42,7 +42,7 @@ def keys_dir() -> Path:
 
 
 def default_camera_source() -> int:
-    env = os.environ.get("BAS_HAR_CAMERA")
+    env = os.environ.get("HALO_CAMERA")
     if env and env.isdigit():
         return int(env)
     return 0

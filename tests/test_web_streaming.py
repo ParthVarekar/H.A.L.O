@@ -6,8 +6,8 @@ import threading
 import time
 from pathlib import Path
 
-from bas_har.schema.cli import load_plan
-from bas_har.web.server import (
+from halo.schema.cli import load_plan
+from halo.web.server import (
     LatestSlot,
     PlaybackClock,
     SessionRunner,

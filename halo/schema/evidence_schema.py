@@ -5,10 +5,10 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field, StringConstraints
 
-from bas_har.schema.plan_schema import StrictModel
+from halo.schema.plan_schema import StrictModel
 
-SIGNED_LOG_FORMAT = "bas-har-signed-log/1"
-DOWNLINK_FORMAT = "bas-har-downlink/1"
+SIGNED_LOG_FORMAT = "halo-signed-log/1"
+DOWNLINK_FORMAT = "halo-downlink/1"
 
 Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 KeyId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{16}$")]
@@ -16,7 +16,7 @@ KeyId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{16}$")]
 
 class SignedLogHeader(StrictModel):
     kind: Literal["header"] = "header"
-    format: Literal["bas-har-signed-log/1"] = SIGNED_LOG_FORMAT
+    format: Literal["halo-signed-log/1"] = SIGNED_LOG_FORMAT
     exp_id: str = Field(min_length=1)
     plan_sha256: Sha256Hex
     public_key: str = Field(min_length=40, description="Raw Ed25519 public key, base64.")
@@ -64,7 +64,7 @@ class DownlinkAlert(StrictModel):
 
 
 class DownlinkReport(StrictModel):
-    format: Literal["bas-har-downlink/1"] = DOWNLINK_FORMAT
+    format: Literal["halo-downlink/1"] = DOWNLINK_FORMAT
     exp_id: str
     plan_sha256: Sha256Hex
     key_id: KeyId

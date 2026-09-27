@@ -9,9 +9,9 @@ from typing import Any
 
 import cv2
 
-from bas_har.schema.activity_schema import ActivityId, RecordId, TakeRecord, VisualAnnotation
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import list_takes
+from halo.schema.activity_schema import ActivityId, RecordId, TakeRecord, VisualAnnotation
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import list_takes
 
 _WRITE_LOCK = threading.RLock()
 
@@ -53,8 +53,8 @@ def save_annotation(
         raise ValueError(f"annotation references unknown take: {annotation.take_id}")
     plan_path = registry.package_dir(manifest.activity_id) / manifest.plan_path
     if annotation.bbox is not None and plan_path.is_file():
-        from bas_har.studio.datasets import annotation_class
-        from bas_har.studio.plans import load_activity_plan
+        from halo.studio.datasets import annotation_class
+        from halo.studio.plans import load_activity_plan
 
         annotation_class(
             annotation.label,

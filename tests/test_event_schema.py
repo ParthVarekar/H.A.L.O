@@ -1,4 +1,4 @@
-"""Tests for bas_har.schema.event_schema.EventRecord."""
+"""Tests for halo.schema.event_schema.EventRecord."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
+from halo.schema.event_schema import AlertCode, EventRecord, StepStatus
 
 
 def test_event_record_minimal() -> None:

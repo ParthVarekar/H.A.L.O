@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from bas_har.perception.types import HandKeypoints
+from halo.perception.types import HandKeypoints
 
 
 class HandKeypointExtractor:

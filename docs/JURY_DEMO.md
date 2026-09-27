@@ -77,7 +77,7 @@ Scroll to **Signed session report**.
 In the terminal:
 
 ```bash
-python -m bas_har verify-log logs\<latest>.jsonl
+python -m halo verify-log logs\<latest>.jsonl
 ```
 
 It prints `VALID`. Open the file, change one character, and run it again. It prints
@@ -114,7 +114,7 @@ Point at the terminal with `ALL CHECKS PASSED (8/8)`.
   with 11 held back for testing. Held-out mAP50 is 0.79. The detector is in the repository.
 - **Why not a single end-to-end network?** Flight procedures need explanations. Our engine is
   deterministic and every alert names the rule it broke. Perception feeds it evidence.
-- **Does it need the internet?** No. Every model runs locally, and `python -m bas_har verify` works
+- **Does it need the internet?** No. Every model runs locally, and `python -m halo verify` works
   with the network unplugged.
 - **What about 3D body tracking?** It isn't in this release. We recognise steps from what happens
   to the equipment, which is what a procedure is checked against.

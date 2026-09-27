@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.display_schema import DisplaySettings
+from halo.schema.display_schema import DisplaySettings
 
 
 def test_display_settings_default_shows_boxes() -> None:

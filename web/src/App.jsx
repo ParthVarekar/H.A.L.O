@@ -58,9 +58,9 @@ const EMPTY_STATUS = {
 const SESSION_LOG_LIMIT = 500;
 const LOG_DISPLAY_LIMIT = 200;
 const UPLOAD_PATH = /[\\/]logs[\\/]uploads[\\/]/;
-const BOXES_PREFERENCE_KEY = "bas-har-show-boxes";
-const THEME_KEY = "bas-har-theme";
-const VOICE_LANGUAGE_KEY = "bas-har-voice-lang";
+const BOXES_PREFERENCE_KEY = "halo-show-boxes";
+const THEME_KEY = "halo-theme";
+const VOICE_LANGUAGE_KEY = "halo-voice-lang";
 
 function readVoiceLanguage() {
   try {

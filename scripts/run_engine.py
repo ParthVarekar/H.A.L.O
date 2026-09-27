@@ -14,11 +14,11 @@ from pathlib import Path
 
 import cv2
 
-from bas_har.config import logs_dir
-from bas_har.io import CrcJsonlEventSink
-from bas_har.perception import PerceptionPipeline
-from bas_har.procedure import build_engine
-from bas_har.schema.cli import load_plan
+from halo.config import logs_dir
+from halo.io import CrcJsonlEventSink
+from halo.perception import PerceptionPipeline
+from halo.procedure import build_engine
+from halo.schema.cli import load_plan
 
 
 def main(argv: list[str] | None = None) -> int:

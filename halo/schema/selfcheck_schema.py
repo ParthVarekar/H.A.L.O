@@ -2,7 +2,7 @@
 
 from pydantic import Field
 
-from bas_har.schema.plan_schema import StrictModel
+from halo.schema.plan_schema import StrictModel
 
 
 class CheckResult(StrictModel):

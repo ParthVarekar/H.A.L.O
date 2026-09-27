@@ -1,4 +1,4 @@
-"""Entry point for `python -m bas_har`.
+"""Entry point for `python -m halo`.
 
 Subcommands:
     verify           reproduce the reference ISS run and check its signed evidence
@@ -11,13 +11,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from bas_har import __version__
-from bas_har.config import keys_dir
+from halo import __version__
+from halo.config import keys_dir
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="bas-har",
+        prog="halo",
         description="AI Human Activity Recognition for on-board BAS experiments (SIH26174).",
     )
     parser.add_argument(
@@ -43,13 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _trusted_key(path: Path) -> bytes | None:
-    from bas_har.io.signed_log import load_public_key
+    from halo.io.signed_log import load_public_key
 
     return load_public_key(path) if path.is_file() else None
 
 
 def _verify_log(log: Path, public_key: Path) -> int:
-    from bas_har.io.signed_log import verify_signed_log
+    from halo.io.signed_log import verify_signed_log
 
     report = verify_signed_log(log, _trusted_key(public_key))
     if report.ok:
@@ -65,7 +65,7 @@ def _verify_log(log: Path, public_key: Path) -> int:
 
 
 def _verify_downlink(report_path: Path, log: Path | None, public_key: Path) -> int:
-    from bas_har.io.signed_log import verify_downlink
+    from halo.io.signed_log import verify_downlink
 
     key = _trusted_key(public_key)
     if key is None:
@@ -83,7 +83,7 @@ def _verify_downlink(report_path: Path, log: Path | None, public_key: Path) -> i
 
 
 def _verify(device: str) -> int:
-    from bas_har.selfcheck import format_report, run_selfcheck
+    from halo.selfcheck import format_report, run_selfcheck
 
     print("Reproducing the reference run: MELFI sample stowage, ESA Ignis mission footage.\n")
     report = run_selfcheck(device=device)

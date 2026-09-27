@@ -1,4 +1,4 @@
-# BAS-HAR Progress Log
+# H.A.L.O. Progress Log
 
 ## Continuation checkpoint
 
@@ -44,9 +44,9 @@
 
 **Status:** complete
 
-- Added `bas_har/schema/activity_schema.py` with typed activity, take, timeline, bounding-box,
+- Added `halo/schema/activity_schema.py` with typed activity, take, timeline, bounding-box,
   visual annotation, dataset, job, evaluation, and model-release contracts.
-- Added `bas_har/studio/registry.py` for local filesystem-backed activity packages.
+- Added `halo/studio/registry.py` for local filesystem-backed activity packages.
 - Added `activities_dir()` to the central path configuration.
 - Added schema and registry tests.
 - Verification: 11 targeted tests passed; full suite passed; Ruff lint and format checks passed.
@@ -73,7 +73,7 @@
 
 **Status:** complete
 
-- Added validated activity-plan load/save services under `bas_har/studio/plans.py`.
+- Added validated activity-plan load/save services under `halo/studio/plans.py`.
 - Added `/api/activities/<id>/plan` GET and PUT endpoints with package-path safety checks.
 - Added the React procedure builder for objects, detector classes, evidence kinds, steps, and
   transitions.
@@ -103,11 +103,11 @@
 **Status:** complete
 
 - Added browser keyframe endpoints and human visual-annotation persistence in
-  `bas_har/studio/annotations.py`, including frame extraction, bounded box validation, and
+  `halo/studio/annotations.py`, including frame extraction, bounded box validation, and
   append-only `annotations.jsonl` storage.
 - Added a React keyframe reviewer with take selection, configurable sampling, drag-box labels, and
   saved detector classes.
-- Added dataset integrity reports in `bas_har/studio/quality.py` for split counts, missing labels,
+- Added dataset integrity reports in `halo/studio/quality.py` for split counts, missing labels,
   malformed YOLO rows, class coverage, and held-out split availability.
 - Persisted the actual recording-session membership of each train, validation, and test split and
   surfaced warnings for prototype-only or limited-robustness datasets.
@@ -115,12 +115,12 @@
   one recording session cannot cross train, validation, and test boundaries.
 - Connected reviewed boxes to dataset preparation. Manual annotations replace auto-colour labels on
   corrected frames and extract an extra image when the reviewed frame was not sampled.
-- Added held-out detector metrics and background evaluation jobs in `bas_har/studio/evaluation.py`.
+- Added held-out detector metrics and background evaluation jobs in `halo/studio/evaluation.py`.
   The quality gate runs before model inference and reports precision, recall, F1, TP, FP, FN, and a
   per-image failure gallery.
 - Added a downloadable CSV evaluation report from the React dashboard.
 - Added checksummed model candidates plus explicit reviewer approval and activation in
-  `bas_har/studio/releases.py`; failed evaluations cannot create candidates.
+  `halo/studio/releases.py`; failed evaluations cannot create candidates.
 - Added API routes and Training Studio controls for quality checks, held-out evaluation, reports,
   release candidates, and reviewer approval.
 - Verification: full suite passed; 115 tests passed; Ruff lint and format checks passed; React build
@@ -372,7 +372,7 @@ change, then commit and push the handoff.
 **Agent:** Claude Code (owner's collaborator plan fell through; owner asked Claude Code to box
 the take directly instead of waiting on a human annotator)
 
-- Started the Training Studio server (`bas_har.web.server`, plan `experiments/red_blue_box/experiment_plan.yaml`,
+- Started the Training Studio server (`halo.web.server`, plan `experiments/red_blue_box/experiment_plan.yaml`,
   `models/yolo11n.pt`, device auto) and drove STEP 05 through the browser to draw and save human
   bounding boxes on `studying_cells_in_space-c2dce8af89` (`cold_stowage_melfi`).
 - Sampled every 40 frames (96 keyframes across the 153.04 s take) and did a single visual pass
@@ -524,7 +524,7 @@ Activity total after this pass: 70 human-reviewed boxes (`interviewee` 28, `life
 19, `astronaut` 9, `computer` 5, `esa_logo` 8, `sample_container` 1).
 
 **Bug found and worked around (not a code fix, a data workaround):**
-`bas_har/studio/datasets.py::ensure_dataset_config` only writes `datasets/dataset_v1/data.yaml`
+`halo/studio/datasets.py::ensure_dataset_config` only writes `datasets/dataset_v1/data.yaml`
 the first time it is created (`if not data_path.is_file(): write`) and never regenerates it after
 that, even when the activity's `plan.yaml` class list changes. This meant the Checkpoint 22 plan
 fix (removing `melfi_freezer`/`dewar_compartment`/`control_panel`, adding
@@ -567,7 +567,7 @@ rejected despite 87 boxes after a visual spot-check: 3 of 4 sampled `container` 
 the burned-in subtitle text, and `syringe` boxes cover the whole glovebag work area.
 `foaming_fluid_science` has too few instances for 3 of its 5 classes.
 
-**Why the Studio training button cannot work today:** `bas_har/studio/jobs.py::_run` calls
+**Why the Studio training button cannot work today:** `halo/studio/jobs.py::_run` calls
 `scripts.train_yolo._validate_dataset(..., allow_missing_classes=False)`, which raises when the
 val split is empty (always true with one recording session) and when any plan class has zero
 labels (`nasa_logo`, `title_card`). This explains the earlier failed Concrete Hardening attempts.
@@ -615,7 +615,7 @@ correctly, and does it understand the experiment / decode next steps?
 
 **Method:** scratch script (outside repo) fed every frame of the MELFI take into the real
 `ProcedureEngine`: YOLO detections from `melfi_selfcheck_v1/best.pt` (conf 0.25) plus MediaPipe pose
-from `bas_har.perception.PoseEstimator` (pose found on 68% of frames). Two engines ran on identical
+from `halo.perception.PoseEstimator` (pose found on 68% of frames). Two engines ran on identical
 perception: A = `plan.yaml` as-is; B = same plan without `step_001` (title_card). Replay wall time
 140.4 s for 153.0 s of video, so the engine's wall-clock pause and cooldown timers ran at ~92% speed.
 
@@ -668,7 +668,7 @@ dashboard, have it recognise the experiment, and announce step completion/failur
 objects, which never appear in the take; `step_002` expected duration set to 40 s; timeline re-imported
 (interviewee now 0–40 s). Saved through `PUT /api/activities/cold_stowage_melfi/plan`.
 
-**Fix 2 — stall limit follows step duration (`bas_har/procedure/engine.py`):** after a step completes,
+**Fix 2 — stall limit follows step duration (`halo/procedure/engine.py`):** after a step completes,
 the pause tolerance while waiting for the next step is `max(pause_tolerance_s, 1.5 ×
 completed.expected_duration_s)` (`PAUSE_DURATION_MARGIN`), because the completed step's activity is
 still under way. New `use_media_time` option (off by default; on for uploaded files) drives pause and
@@ -681,8 +681,8 @@ misclassified 2 of 3 real videos (Foaming and Concrete both → MELFI). Each det
 video only, so the MELFI model labels any person "interviewee" and any enclosure "glovebox". Replaced
 before merge.
 
-**Recognition — shipped approach (`bas_har/studio/recognition.py`, schema
-`bas_har/schema/recognition_schema.py`):** 24 frames of the uploaded video are embedded with the COCO
+**Recognition — shipped approach (`halo/studio/recognition.py`, schema
+`halo/schema/recognition_schema.py`):** 24 frames of the uploaded video are embedded with the COCO
 `models/yolo11n.pt` backbone (`YOLO.embed`, 256-d, no download) and compared with 32 frames from each
 activity's stored takes. A frame votes for its most similar activity only if cosine similarity ≥ 0.90.
 Recognised when the winner has ≥ 50% of frames and leads the runner-up by ≥ 25 points. Calibration of the
@@ -697,7 +697,7 @@ labelled; train-set mAP50 0.549, `experiment_container` 0.0 from its single labe
 earlier training approval. Activity detectors now live at `activities/<id>/models/detector.pt` (MELFI
 and Foaming). These `.pt` files are not covered by `.gitignore` (which only ignores root `models/`).
 
-**Server (`bas_har/web/server.py`):** `POST /api/analyze` (raw video body, `X-Filename`) saves to
+**Server (`halo/web/server.py`):** `POST /api/analyze` (raw video body, `X-Filename`) saves to
 `logs/uploads/`, runs recognition, and on a match with a detector replaces the plan, sets the detector,
 and starts `SessionRunner(..., filter_default_classes=False, use_media_time=True)`. Unrecognised uploads
 are deleted. When a run ends, status carries `summary` (completed/missed steps, `source_finished`);
@@ -778,7 +778,7 @@ completed in the summary; decide whether to gitignore `activities/*/models/*.pt`
 - Owner's test (started with `startup.bat`, watched in their own browser) ran at 0.20x real time (42.8 s of video in 217.6 s, from `logs/web_cold_stowage_melfi_1789482805.jsonl`). Profiling ruled out CPU inference (25 ms/frame on this CPU), FP16 (slower on the RTX 5050: 21.7 vs 8.7 ms) and power throttling. Reproducing with the in-app browser attached gave 1.88x, so the exact trigger in the owner's browser was not reproduced; the pipeline was restructured so no viewer, disk or encode work can slow analysis.
 - `SessionRunner` now uses three threads: analysis (decode, GPU detect, engine; unchanged step logic), presenter (overlay + JPEG encode from a newest-frame `LatestSlot`), and recorder (MP4 backup from a drop-oldest queue, only for live cameras/RTSP; uploads skip it).
 - File sources are paced by `PlaybackClock` to the video's own frame rate; frames are skipped for detection only when more than 0.5 s behind. The MJPEG stream now waits on a `threading.Condition` (`WebState.wait_for_frame`) instead of polling at 30 Hz.
-- GPU: detector warm-up before playback; stream JPEGs encoded with nvjpeg (`bas_har/web/frame_encoder.py`, OpenCV fallback); overlay blends only the header strip. Status exposes `realtime_factor`, `lag_s`, `timings_ms`, `display_fps`, `encoder`, `cpu_fallback`; the dashboard shows a speed readout and a red banner if running on CPU with an NVIDIA GPU present. Per-session perf lines are written to `<session log>.perf.jsonl`. The dashboard re-fetches the plan and activity list only when `plan_revision` changes.
+- GPU: detector warm-up before playback; stream JPEGs encoded with nvjpeg (`halo/web/frame_encoder.py`, OpenCV fallback); overlay blends only the header strip. Status exposes `realtime_factor`, `lag_s`, `timings_ms`, `display_fps`, `encoder`, `cpu_fallback`; the dashboard shows a speed readout and a red banner if running on CPU with an NVIDIA GPU present. Per-session perf lines are written to `<session log>.perf.jsonl`. The dashboard re-fetches the plan and activity list only when `plan_revision` changes.
 - Verified with the server started like `startup.bat` and a browser attached: 1.000x real time, 25.0 fps delivered to the stream client (gap mean 40 ms, p95 50 ms), zero skipped or dropped frames, device cuda:0 with nvjpeg, all 8 MELFI steps at the same video times as Checkpoint 30 with no alerts.
 
 ## Checkpoint 32 - 2026-09-15 - Voice alerts keep up with step completions
@@ -793,8 +793,8 @@ completed in the summary; decide whether to gitignore `activities/*/models/*.pt`
 - Problem the owner raised: the trained MELFI detector only works on the video it was trained on, and boxing a video per activity is slow. Measured this first on an unseen MELFI video (`studying cells in space.mp4`, a different astronaut, same freezer, MELFI visible for roughly the first 22 s of 153 s): the trained detector misses the freezer, dewars, tray and sample, and labels the Life Sciences Glovebox as `melfi_freezer` on 63% of frames.
 - MMAction2 was evaluated and rejected: its `mmcv` wheels stop at torch 2.4 / CUDA 12.1, while the RTX 5050 is Blackwell (compute 12.0) and needs CUDA 12.8 with torch >= 2.7. It is also a clip classifier, not a source of object state, so it would not answer "is the hatch open".
 - Two new perception paths, both used without any training:
-  - `bas_har/perception/open_vocab.py` - YOLOE with the MobileCLIP text encoder. `ObjectSpec.prompts` holds plain-text descriptions ("freezer rack with round doors"); `ExperimentPlan.prompt_classes()` maps each prompt back to a class name so the rest of the pipeline is unchanged. Weights live in `models/yoloe-11s-seg.pt` (27.8 MB) and `models/mobileclip_blt.ts` (599.8 MB, gitignored).
-  - `bas_har/perception/vlm.py` - `VisualQuestionAnswerer` (Qwen3-VL-2B-Instruct, Apache-2.0, bfloat16, frames resized to 768 px) answers a list of yes/no questions about one frame, and `AsyncVisualQuestioner` runs it on a background thread with a newest-frame slot, so the 25 fps analysis thread never waits for it. Answers reach the engine as `PerceptionResult.questions` and a new evidence kind `visual_question`.
+  - `halo/perception/open_vocab.py` - YOLOE with the MobileCLIP text encoder. `ObjectSpec.prompts` holds plain-text descriptions ("freezer rack with round doors"); `ExperimentPlan.prompt_classes()` maps each prompt back to a class name so the rest of the pipeline is unchanged. Weights live in `models/yoloe-11s-seg.pt` (27.8 MB) and `models/mobileclip_blt.ts` (599.8 MB, gitignored).
+  - `halo/perception/vlm.py` - `VisualQuestionAnswerer` (Qwen3-VL-2B-Instruct, Apache-2.0, bfloat16, frames resized to 768 px) answers a list of yes/no questions about one frame, and `AsyncVisualQuestioner` runs it on a background thread with a newest-frame slot, so the 25 fps analysis thread never waits for it. Answers reach the engine as `PerceptionResult.questions` and a new evidence kind `visual_question`.
 - Question phrasing turned out to matter more than the model. Absence-phrased questions failed outright on the unseen video (tray pushed back: recall 0.00; all doors closed: recall 0.00; compartment closed: accuracy 0.24). `EvidenceRule.expect: yes|no` was added so every question is asked positively and the closing steps expect the answer "no" to the same question. Asking questions in small batches was also worse than one call with all of them (more unanswered questions), so they stay in a single call.
 - `ProcedureEngine._state_change_pending` was generalised (`_change_key`) to cover `visual_question` + `expect` as well as `object_state`, because step 8's "door open? -> no" is trivially true at video start and previously made the engine mark the whole procedure skipped in the first two seconds.
 - `activities/melfi_zeroshot/` is the described-not-trained MELFI plan: 6 objects with prompts, 8 steps, 5 questions, no detector file and no boxes. The server picks zero-shot mode automatically when an activity has no `models/detector.pt` but its objects have prompts (status reports `mode: zero_shot` and the live answers; the dashboard shows a "described, not trained" row and a "what the model sees" panel).
@@ -856,7 +856,7 @@ completed in the summary; decide whether to gitignore `activities/*/models/*.pt`
 
 ## Checkpoint 38 - 2026-09-26 - Light theme and a light-only README
 
-- The Operations dashboard has a light theme. A sun/moon button in the app bar switches it and the choice is saved in the browser (`bas-har-theme`); `?theme=light` or `?theme=dark` forces one. The video stage stays dark in both themes. The Training Studio is unchanged.
+- The Operations dashboard has a light theme. A sun/moon button in the app bar switches it and the choice is saved in the browser (`halo-theme`); `?theme=light` or `?theme=dark` forces one. The video stage stays dark in both themes. The Training Studio is unchanged.
 - Every README image is now light: the demo, both product shots and the model-answers card were re-captured from the light dashboard, and the dark banner and diagram were removed.
 - The README follows patterns from awesome-readme: a collapsible table of contents, back-to-top links, a "Why it matters" section, a feature-grid graphic (`features.png`), a recognition-modes graphic (`modes.png`: described, trained, hybrid), a gallery, a collapsible FAQ and a "Built with" strip. 215 tests pass, Ruff clean.
 
@@ -864,11 +864,11 @@ completed in the summary; decide whether to gitignore `activities/*/models/*.pt`
 
 Prompted by the competitor scan (51 rival repositories): we held real footage, real weights and real metrics, but requirement 5 was half-met, requirement 2 was only implicit, the "tamper-evident" log was per-line CRC, and there was nothing a judge could run.
 
-- **Stream to a specific IP (requirement 5):** `bas_har/io/stream_out.py` `UdpStreamPublisher` sends the annotated video as MPEG-TS over UDP (h264_nvenc, then libx264, h264_mf, mpeg2video) on its own thread with a newest-frame slot. `StreamOutputSettings` schema; `GET/POST /api/stream-out`; `--stream-to udp://ip:port`; `BAS_HAR_STREAM_TO` and opt-in `BAS_HAR_HOST` in `startup.bat`; a "Stream to IP" card in the dashboard. Recordings now go to a per-session folder under `logs/buffer/<exp>/`.
+- **Stream to a specific IP (requirement 5):** `halo/io/stream_out.py` `UdpStreamPublisher` sends the annotated video as MPEG-TS over UDP (h264_nvenc, then libx264, h264_mf, mpeg2video) on its own thread with a newest-frame slot. `StreamOutputSettings` schema; `GET/POST /api/stream-out`; `--stream-to udp://ip:port`; `HALO_STREAM_TO` and opt-in `HALO_HOST` in `startup.bat`; a "Stream to IP" card in the dashboard. Recordings now go to a per-session folder under `logs/buffer/<exp>/`.
 - **Next step spoken (requirement 2):** `StepSpec.instruction` and `ExperimentPlan.spoken_name` (keyed `en`/`hi`), filled in for the MELFI, MELFI-described and red/blue plans. `web/src/speech.js` builds every phrase in English and Hindi: "Monitoring ... First: ...", "Step N done. Next: ...", "Procedure complete.", alerts and the summary. The Now bar shows the next instruction. Local voices only; English prefers an en-IN voice; the EN/हिं switch falls back to English with a notice when Windows has no Hindi voice.
 - **Step overdue alert:** the engine raises `STEP_OVERDUE` once when a step stays current past its plan `timeout_s`.
-- **Signed record (requirement 4):** `bas_har/io/signed_log.py`: each line is `{seq, payload, prev, hash, sig}` with a SHA-256 chain and an Ed25519 signature by a per-machine station key in `keys/` (gitignored). At session end a signed downlink report (~1 KB) seals the final hash and event count. The dashboard shows it verified with the size ratio, and `/api/downlink` and `/api/session-log` download it. `cryptography` is now a core dependency (AGENTS.md rule 4 updated).
-- **Reproduction for judges:** `python -m bas_har verify` (also `startup.bat verify`) validates every plan, runs the ISS take through the dashboard's own session runner, checks 8/8 in order, 0 alerts and both signatures, then runs `activities/cold_stowage_melfi/verification/step1_removed.mp4` (the same footage from 12 s) and checks the skip is caught. Result: 8/8 checks pass in about a minute. `verify-log` and `verify-downlink` subcommands.
+- **Signed record (requirement 4):** `halo/io/signed_log.py`: each line is `{seq, payload, prev, hash, sig}` with a SHA-256 chain and an Ed25519 signature by a per-machine station key in `keys/` (gitignored). At session end a signed downlink report (~1 KB) seals the final hash and event count. The dashboard shows it verified with the size ratio, and `/api/downlink` and `/api/session-log` download it. `cryptography` is now a core dependency (AGENTS.md rule 4 updated).
+- **Reproduction for judges:** `python -m halo verify` (also `startup.bat verify`) validates every plan, runs the ISS take through the dashboard's own session runner, checks 8/8 in order, 0 alerts and both signatures, then runs `activities/cold_stowage_melfi/verification/step1_removed.mp4` (the same footage from 12 s) and checks the skip is caught. Result: 8/8 checks pass in about a minute. `verify-log` and `verify-downlink` subcommands.
 - **Offline:** the vision-language model loads with `local_files_only=True` first.
 - **Fix:** starting from the launch config with a custom detector filtered detections to the stock classes, so MELFI stuck on step 1. The server now filters only when every plan class is a stock class.
 - **Docs:** `docs/SIH_REQUIREMENTS.md` (traceability), `docs/VERIFICATION.md` (three commands and expected output), `docs/JURY_DEMO.md` (timed five-minute script). README gains a requirements table, "Verify it yourself", new features and FAQ entries, and a refreshed `features.png`. USP.md updated. 276 tests pass, Ruff clean.

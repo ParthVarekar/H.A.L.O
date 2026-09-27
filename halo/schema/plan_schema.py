@@ -1,7 +1,7 @@
 """Pydantic schema for experiment_plan.yaml.
 
 This is the single source of truth for what an experiment looks like to the engine.
-The procedure engine in `bas_har/procedure/` is generic over this schema; the only
+The procedure engine in `halo/procedure/` is generic over this schema; the only
 experiment-specific knowledge lives in YAML files under `experiments/<demo>/`.
 """
 

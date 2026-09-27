@@ -169,8 +169,8 @@ export function AppBar({ workspace, onWorkspace, connected, gpuName, theme, onTo
         <div className="ops-brand">
           <BrandMark />
           <div className="ops-brand-text">
-            <strong>BAS-HAR</strong>
-            <span>Procedure monitor</span>
+            <strong>H.A.L.O.</strong>
+            <span>Human Activity Logging in Orbit</span>
           </div>
         </div>
         <nav className="ops-segmented" aria-label="Workspace">
@@ -667,7 +667,7 @@ export function EvidencePanel({ downlink }) {
         </a>
       </div>
       <p className="ops-card-note">
-        Every event is SHA-256 chained and Ed25519-signed. Anyone can check a copy with <code>python -m bas_har verify-log</code>.
+        Every event is SHA-256 chained and Ed25519-signed. Anyone can check a copy with <code>python -m halo verify-log</code>.
       </p>
     </section>
   );

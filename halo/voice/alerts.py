@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from bas_har.procedure.alerts import AlertCandidate
-from bas_har.procedure.engine import ProcedureEngine
-from bas_har.schema.event_schema import AlertCode
+from halo.procedure.alerts import AlertCandidate
+from halo.procedure.engine import ProcedureEngine
+from halo.schema.event_schema import AlertCode
 
 
 def format_alert_message(engine: ProcedureEngine, candidate: AlertCandidate) -> str:

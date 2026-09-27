@@ -7,7 +7,7 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints, model_validator
 
-from bas_har.schema.plan_schema import StrictModel
+from halo.schema.plan_schema import StrictModel
 
 ActivityId = Annotated[
     str,

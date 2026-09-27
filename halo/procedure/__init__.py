@@ -6,16 +6,16 @@ EventRecord events. Built in Phase 2.
 
 from __future__ import annotations
 
-from bas_har.procedure.alerts import AlertCandidate, Alerter
-from bas_har.procedure.engine import (
+from halo.procedure.alerts import AlertCandidate, Alerter
+from halo.procedure.engine import (
     EngineOutput,
     EngineState,
     EventSink,
     ProcedureEngine,
     build_engine,
 )
-from bas_har.procedure.events import JsonlEventSink, make_utc_now
-from bas_har.procedure.evidence import (
+from halo.procedure.events import JsonlEventSink, make_utc_now
+from halo.procedure.evidence import (
     EvidenceAccumulator,
     EvidenceVerdict,
     detections_needed,
@@ -23,8 +23,8 @@ from bas_har.procedure.evidence import (
     question_verdict,
     rule_summary,
 )
-from bas_har.procedure.sequence import ColorSequenceTracker, SequenceObservation
-from bas_har.procedure.smoothing import (
+from halo.procedure.sequence import ColorSequenceTracker, SequenceObservation
+from halo.procedure.smoothing import (
     PauseWatchdog,
     RateLimiter,
     RecentEvents,

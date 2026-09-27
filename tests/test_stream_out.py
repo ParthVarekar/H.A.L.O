@@ -8,8 +8,8 @@ import time
 import numpy as np
 import pytest
 
-from bas_har.io.stream_out import UdpStreamPublisher
-from bas_har.schema.stream_schema import StreamOutputSettings
+from halo.io.stream_out import UdpStreamPublisher
+from halo.schema.stream_schema import StreamOutputSettings
 
 TS_SYNC_BYTE = 0x47
 TS_PACKET_BYTES = 188

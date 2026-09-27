@@ -9,16 +9,16 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from bas_har.perception.types import BBox, Detection, PerceptionResult
-from bas_har.procedure import EngineState, build_engine
-from bas_har.procedure.evidence import EvidenceAccumulator
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
-from bas_har.studio.annotations import delete_annotation, list_annotations, save_annotation
-from bas_har.studio.datasets import annotation_class
-from bas_har.studio.plans import save_activity_plan
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import register_take
+from halo.perception.types import BBox, Detection, PerceptionResult
+from halo.procedure import EngineState, build_engine
+from halo.procedure.evidence import EvidenceAccumulator
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.schema.plan_schema import EvidenceRule, ExperimentPlan, ObjectSpec, StepSpec
+from halo.studio.annotations import delete_annotation, list_annotations, save_annotation
+from halo.studio.datasets import annotation_class
+from halo.studio.plans import save_activity_plan
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import register_take
 
 
 def _plan(steps: list[dict]) -> ExperimentPlan:

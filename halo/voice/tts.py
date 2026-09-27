@@ -22,7 +22,7 @@ class TtsEngine:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._init_engine()
-        self._thread = threading.Thread(target=self._loop, name="bas-har-tts", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="halo-tts", daemon=True)
         self._thread.start()
 
     def _init_engine(self) -> None:
@@ -75,7 +75,7 @@ class ConfirmationSound:
         self._queue: Queue[bool | None] = Queue()
         self._stop_event = threading.Event()
         self._thread = threading.Thread(
-            target=self._loop, name="bas-har-confirmation-sound", daemon=True
+            target=self._loop, name="halo-confirmation-sound", daemon=True
         )
         self._thread.start()
 

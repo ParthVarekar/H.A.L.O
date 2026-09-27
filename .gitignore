@@ -89,3 +89,7 @@ keys/
 video/node_modules/
 video/out/
 video/public/footage/
+
+# --- Presentation recording workspace ---
+presentation/
+video/public/pitch/

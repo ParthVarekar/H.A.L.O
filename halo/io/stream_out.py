@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from bas_har.schema.stream_schema import StreamOutputSettings, StreamOutputStatus
+from halo.schema.stream_schema import StreamOutputSettings, StreamOutputStatus
 
 CODEC_PREFERENCE = ("h264_nvenc", "libx264", "h264_mf", "mpeg2video")
 CODEC_OPTIONS: dict[str, dict[str, str]] = {
@@ -59,7 +59,7 @@ class UdpStreamPublisher:
         self._frames_sent = 0
         self._codec: str | None = None
         self._error: str | None = None
-        self._thread = threading.Thread(target=self._run, name="bas-har-stream-out", daemon=True)
+        self._thread = threading.Thread(target=self._run, name="halo-stream-out", daemon=True)
         self._thread.start()
 
     def offer(self, frame_bgr: np.ndarray) -> None:

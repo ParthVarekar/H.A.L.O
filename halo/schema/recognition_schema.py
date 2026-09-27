@@ -2,8 +2,8 @@
 
 from pydantic import Field, model_validator
 
-from bas_har.schema.activity_schema import ActivityId
-from bas_har.schema.plan_schema import StrictModel
+from halo.schema.activity_schema import ActivityId
+from halo.schema.plan_schema import StrictModel
 
 
 class ActivityRecognitionScore(StrictModel):

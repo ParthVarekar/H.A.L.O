@@ -20,9 +20,9 @@ from pathlib import Path
 
 import cv2
 
-from bas_har.config import default_camera_source
-from bas_har.perception.pipeline import PerceptionPipeline
-from bas_har.perception.types import PerceptionResult
+from halo.config import default_camera_source
+from halo.perception.pipeline import PerceptionPipeline
+from halo.perception.types import PerceptionResult
 
 
 def _draw_detections(frame, result: PerceptionResult) -> None:
@@ -131,7 +131,7 @@ def preview(
                 (0, 255, 0),
                 2,
             )
-            cv2.imshow("bas_har perception preview", frame)
+            cv2.imshow("halo perception preview", frame)
             if dump_handle is not None:
                 dump_handle.write(result.to_json() + "\n")
             frame_id += 1

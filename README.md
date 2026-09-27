@@ -1,7 +1,7 @@
 <a id="top"></a>
 
 <p align="center">
-  <img alt="BAS-HAR: watches every step of an experiment in orbit and speaks up the moment one is missed." src="docs/assets/banner-light.png">
+  <img alt="H.A.L.O.: watches every step of an experiment in orbit and speaks up the moment one is missed." src="docs/assets/banner-light.png">
 </p>
 
 <p align="center">
@@ -23,23 +23,23 @@
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="#how-it-works"><b>How it works</b></a> ·
   <a href="#verify-it-yourself"><b>Verify it yourself</b></a> ·
-  <a href="USP.md"><b>Why BAS-HAR</b></a> ·
+  <a href="USP.md"><b>Why H.A.L.O.</b></a> ·
   <a href="docs/assets/demo.mp4"><b>Watch the demo</b></a>
 </p>
 
 <br>
 
 <p align="center">
-  <img alt="BAS-HAR intro: what it does, in under a minute" src="docs/assets/intro.webp" width="100%">
+  <img alt="H.A.L.O. intro: what it does, in under a minute" src="docs/assets/intro.webp" width="100%">
 </p>
 <p align="center">
-  <sub>BAS-HAR in under a minute.</sub>
+  <sub>H.A.L.O. in under a minute.</sub>
 </p>
 
 <br>
 
 <p align="center">
-  <img alt="BAS-HAR following the MELFI sample-stowage procedure on real ISS footage" src="docs/assets/demo.webp" width="100%">
+  <img alt="H.A.L.O. following the MELFI sample-stowage procedure on real ISS footage" src="docs/assets/demo.webp" width="100%">
 </p>
 <p align="center">
   <sub>Real ISS footage of the MELFI −80 °C freezer procedure. Recognised automatically, every step followed in order, zero alerts. Shown at 3× speed.</sub>
@@ -68,12 +68,12 @@
 
 Science on the space station runs to written procedures. A skipped step, such as a tray left
 out of a −80 °C freezer, can cost a sample that took months to prepare. Crews have little time and
-ground teams cannot watch every minute. **BAS-HAR** watches the procedure for them, checks every
+ground teams cannot watch every minute. **H.A.L.O.** watches the procedure for them, checks every
 step against the plan and alerts the crew immediately, all on the station's own hardware.
 
 ## Every requirement, met
 
-| SIH26174 asks for | BAS-HAR delivers |
+| SIH26174 asks for | H.A.L.O. delivers |
 |---|---|
 | Continuous local video processing that tracks the sequence | Live camera, RTSP or video file, 1.00× real time at 25 fps on a laptop GPU |
 | The next step suggested at the start and after each step | Spoken and on screen: *"Step 2 done. Next: pull tray 2 out of dewar 1."* |
@@ -97,7 +97,7 @@ Each row is traced to code, tests and a demo moment in [docs/SIH_REQUIREMENTS.md
   *inside* a compartment.
 - **Understands the whole procedure.** A deterministic engine catches skipped, out-of-order and
   stalled steps, so every alert traces back to a rule you can read.
-- **Recognises the experiment by itself.** Drop in a video and BAS-HAR matches its scenes against
+- **Recognises the experiment by itself.** Drop in a video and H.A.L.O. matches its scenes against
   every procedure in the library.
 - **Streams to the ground.** Send the annotated video to any IP address and open it in VLC, while
   the station keeps its own rolling recording.
@@ -183,7 +183,7 @@ Drop an experiment video onto the page, or connect a camera or RTSP stream. Wind
 NVIDIA GPU is recommended; it also runs on CPU.
 
 To stream to another computer, enter its IP address in the dashboard's **Stream to IP** card (or
-`set BAS_HAR_STREAM_TO=udp://192.168.1.20:5000` before `startup.bat`), then open `udp://@:5000` in
+`set HALO_STREAM_TO=udp://192.168.1.20:5000` before `startup.bat`), then open `udp://@:5000` in
 VLC on that computer.
 
 ## Verify it yourself
@@ -192,7 +192,7 @@ The ISS footage, its labels and the trained detector ship with this repository, 
 result can be reproduced with one command and no network:
 
 ```bash
-python -m bas_har verify
+python -m halo verify
 ```
 
 ```text
@@ -208,7 +208,7 @@ python -m bas_har verify
   ALL CHECKS PASSED (8/8)
 ```
 
-`python -m bas_har verify-log` checks any saved session line by line. Change one character and it
+`python -m halo verify-log` checks any saved session line by line. Change one character and it
 reports the exact line. See [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 <p align="right"><a href="#top">Back to top ↑</a></p>
@@ -258,7 +258,7 @@ written to the event log with the time it happened.
 <details>
 <summary><b>Can I check the results myself?</b></summary>
 <br>
-Yes. Run <code>python -m bas_har verify</code>. It replays the ISS footage that ships with the
+Yes. Run <code>python -m halo verify</code>. It replays the ISS footage that ships with the
 repository, checks every step and alert, and verifies the signatures on the record it writes.
 </details>
 
@@ -282,7 +282,7 @@ recording, so every alert can be reviewed afterwards.
 |---|---|
 | [docs/SIH_REQUIREMENTS.md](docs/SIH_REQUIREMENTS.md) | Each SIH26174 requirement traced to code, tests and a demo moment |
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | Three commands to reproduce and check the results |
-| [USP.md](USP.md) | What makes BAS-HAR different |
+| [USP.md](USP.md) | What makes H.A.L.O. different |
 | [BOXING_GUIDE.md](BOXING_GUIDE.md) | Labelling video, written for non-programmers |
 | [training_guide.md](training_guide.md) | The Training Studio, end to end |
 | [docs/architecture.md](docs/architecture.md) | System design in depth |

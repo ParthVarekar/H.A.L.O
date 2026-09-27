@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bas_har.procedure import (
+from halo.procedure import (
     Alerter,
     EngineState,
     ProcedureEngine,

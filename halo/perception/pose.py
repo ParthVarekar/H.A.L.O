@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from bas_har.perception.types import PoseKeypoints
+from halo.perception.types import PoseKeypoints
 
 MEDIAPIPE_POSE_LANDMARK_NAMES: list[str] = [
     "nose",

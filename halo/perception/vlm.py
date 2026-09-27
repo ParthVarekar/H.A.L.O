@@ -161,7 +161,7 @@ class AsyncVisualQuestioner:
         self._wake = threading.Event()
         self._last_started = 0.0
         self.answered = 0
-        self._thread = threading.Thread(target=self._loop, name="bas-har-vlm", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="halo-vlm", daemon=True)
         self._thread.start()
 
     def submit(self, frame_bgr: np.ndarray, now: float | None = None) -> None:

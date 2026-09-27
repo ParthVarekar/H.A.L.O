@@ -7,16 +7,16 @@ import hashlib
 import io
 from pathlib import Path
 
-from bas_har.schema.activity_schema import (
+from halo.schema.activity_schema import (
     ActivityId,
     PackageVerification,
     RecordId,
     ReleaseStatus,
 )
-from bas_har.studio.evaluation import load_evaluation_report
-from bas_har.studio.plans import load_activity_plan
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.releases import list_releases, load_release
+from halo.studio.evaluation import load_evaluation_report
+from halo.studio.plans import load_activity_plan
+from halo.studio.registry import ActivityRegistry
+from halo.studio.releases import list_releases, load_release
 
 
 def verify_activity_package(

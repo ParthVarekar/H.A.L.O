@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from bas_har.io.signed_log import (
+from halo.io.signed_log import (
     GENESIS_HASH,
     SignedJsonlEventSink,
     build_downlink,
@@ -21,8 +21,8 @@ from bas_har.io.signed_log import (
     verify_signed_log,
     write_downlink,
 )
-from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
-from bas_har.schema.plan_schema import ExperimentPlan
+from halo.schema.event_schema import AlertCode, EventRecord, StepStatus
+from halo.schema.plan_schema import ExperimentPlan
 
 
 def _plan() -> ExperimentPlan:

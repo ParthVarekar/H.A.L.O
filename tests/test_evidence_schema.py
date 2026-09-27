@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.evidence_schema import (
+from halo.schema.evidence_schema import (
     DownlinkReport,
     DownlinkStep,
     SignedLogHeader,
@@ -29,7 +29,7 @@ def test_signed_log_header_minimal_valid() -> None:
         created_utc=datetime.now(UTC),
     )
     assert header.kind == "header"
-    assert header.format == "bas-har-signed-log/1"
+    assert header.format == "halo-signed-log/1"
 
 
 def test_signed_log_header_rejects_bad_hash_and_missing_key() -> None:
@@ -66,7 +66,7 @@ def test_downlink_report_full_valid() -> None:
         log_final_hash=HASH,
         source_bytes=100,
     )
-    assert report.format == "bas-har-downlink/1"
+    assert report.format == "halo-downlink/1"
     assert report.alerts == []
 
 

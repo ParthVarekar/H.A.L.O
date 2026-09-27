@@ -7,10 +7,10 @@ consumes `PerceptionResult`; it never touches Ultralytics / MediaPipe APIs.
 
 from __future__ import annotations
 
-from bas_har.perception.color_blocks import ColorBlockDetector
-from bas_har.perception.detector import ObjectDetector
-from bas_har.perception.pipeline import PerceptionPipeline
-from bas_har.perception.types import (
+from halo.perception.color_blocks import ColorBlockDetector
+from halo.perception.detector import ObjectDetector
+from halo.perception.pipeline import PerceptionPipeline
+from halo.perception.types import (
     BBox,
     Detection,
     HandKeypoints,

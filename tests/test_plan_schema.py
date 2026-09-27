@@ -1,4 +1,4 @@
-"""Tests for the Pydantic schema in bas_har.schema.plan_schema.
+"""Tests for the Pydantic schema in halo.schema.plan_schema.
 
 Covers valid minimal, valid full, invalid (missing required field), and
 invalid (bad enum / bad cross-reference) cases.
@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from bas_har.schema.plan_schema import (
+from halo.schema.plan_schema import (
     AlertPolicy,
     CameraConfig,
     EvidenceRule,

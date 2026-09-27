@@ -7,15 +7,15 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from bas_har.schema.activity_schema import ActivityKind, ActivityManifest
-from bas_har.studio.annotations import (
+from halo.schema.activity_schema import ActivityKind, ActivityManifest
+from halo.studio.annotations import (
     list_annotations,
     list_keyframes,
     read_take_frame,
     save_annotation,
 )
-from bas_har.studio.registry import ActivityRegistry
-from bas_har.studio.takes import register_take
+from halo.studio.registry import ActivityRegistry
+from halo.studio.takes import register_take
 
 
 def _video(path: Path, frames: int = 6) -> None:

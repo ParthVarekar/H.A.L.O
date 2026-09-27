@@ -6,9 +6,9 @@ from pathlib import Path
 
 import yaml
 
-from bas_har.schema.activity_schema import ActivityLifecycle
-from bas_har.schema.plan_schema import ExperimentPlan
-from bas_har.studio.registry import ActivityRegistry
+from halo.schema.activity_schema import ActivityLifecycle
+from halo.schema.plan_schema import ExperimentPlan
+from halo.studio.registry import ActivityRegistry
 
 
 def load_activity_plan(

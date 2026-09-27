@@ -8,12 +8,12 @@ from typing import Any
 
 import numpy as np
 
-from bas_har.perception.color_blocks import ColorBlockDetector
-from bas_har.perception.detector import ObjectDetector
-from bas_har.perception.hands import HandKeypointExtractor
-from bas_har.perception.hoi import HandObjectInteractionTagger
-from bas_har.perception.pose import PoseEstimator
-from bas_har.perception.types import PerceptionResult
+from halo.perception.color_blocks import ColorBlockDetector
+from halo.perception.detector import ObjectDetector
+from halo.perception.hands import HandKeypointExtractor
+from halo.perception.hoi import HandObjectInteractionTagger
+from halo.perception.pose import PoseEstimator
+from halo.perception.types import PerceptionResult
 
 
 class PerceptionPipeline:
@@ -34,7 +34,7 @@ class PerceptionPipeline:
         if not run_detector:
             self._device = ObjectDetector.resolve_device(device)
         elif prompt_classes:
-            from bas_har.perception.open_vocab import OpenVocabDetector
+            from halo.perception.open_vocab import OpenVocabDetector
 
             self.detector = OpenVocabDetector(
                 prompt_classes=prompt_classes,

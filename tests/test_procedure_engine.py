@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from bas_har.perception.types import (
+from halo.perception.types import (
     BBox,
     Detection,
     HandKeypoints,
@@ -17,14 +17,14 @@ from bas_har.perception.types import (
     PerceptionResult,
     PoseKeypoints,
 )
-from bas_har.procedure import (
+from halo.procedure import (
     EngineState,
     JsonlEventSink,
     build_engine,
 )
-from bas_har.schema.cli import load_plan
-from bas_har.schema.event_schema import AlertCode, EventRecord, StepStatus
-from bas_har.schema.plan_schema import ExperimentPlan
+from halo.schema.cli import load_plan
+from halo.schema.event_schema import AlertCode, EventRecord, StepStatus
+from halo.schema.plan_schema import ExperimentPlan
 
 PLAN_YAML = """
 id: TEST-3STEP
@@ -232,7 +232,7 @@ def test_media_time_rate_limit_ignores_wall_clock() -> None:
 
 
 def _candidate():
-    from bas_har.procedure import AlertCandidate
+    from halo.procedure import AlertCandidate
 
     return AlertCandidate(
         code=AlertCode.SKIP_DETECTED,

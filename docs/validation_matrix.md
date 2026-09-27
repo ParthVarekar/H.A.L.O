@@ -68,7 +68,7 @@ If their description matches in order, Phase 0 is done.
 | Region geometry required for location rules | schema rejects missing or unknown geometry | `tests/test_plan_schema.py` | pass |
 | BBox fully inside polygon | `in_region` evidence | `tests/test_evidence.py` | pass |
 | BBox outside region | `outside_of` evidence | `tests/test_evidence.py` | pass |
-| Live capture worker | frame delivery and clean stop | `bas_har/web/server.py` session runner | pass |
+| Live capture worker | frame delivery and clean stop | `halo/web/server.py` session runner | pass |
 | Voice worker shutdown | no blocked TTS thread | `tests/test_voice.py` | pass |
 | Circular MP4 buffer | bounded rotating segments | `tests/test_io.py` | pass |
 | CRC JSONL | tampering detected | `tests/test_io.py` | pass |
@@ -166,7 +166,7 @@ frames, which the VLM has never seen.
 
 | Check | Target | Evidence | Status |
 |---|---|---|---|
-| One-command reproduction | ISS take end to end from a clean checkout | `python -m bas_har verify`: 8/8 steps in order, 0 alerts, 37 s on cuda:0 | pass |
+| One-command reproduction | ISS take end to end from a clean checkout | `python -m halo verify`: 8/8 steps in order, 0 alerts, 37 s on cuda:0 | pass |
 | Skipped step on real footage | the same take with step 1 cut out raises a skip | `verification/step1_removed.mp4`: SKIP_DETECTED at 1.48 s, OUT_OF_ORDER at 3.0 s; same in the real-time dashboard | pass |
 | Signed, hash-chained log | edits, deletions, reordering, forged signatures and other keys detected | `tests/test_signed_log.py`; one edited field in a real log reported at its line | pass |
 | Downlink report | signed, kilobyte-scale, seals the log | MELFI: 1,002 bytes, 9,701x smaller than the 9.7 MB video; a truncated log fails the seal | pass |

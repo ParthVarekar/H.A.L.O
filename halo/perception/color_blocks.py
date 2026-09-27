@@ -7,7 +7,7 @@ from collections.abc import Iterable
 import cv2
 import numpy as np
 
-from bas_har.perception.types import BBox, Detection
+from halo.perception.types import BBox, Detection
 
 
 class ColorBlockDetector:

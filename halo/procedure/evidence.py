@@ -17,8 +17,8 @@ from collections import defaultdict, deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 
-from bas_har.perception.types import BBox, PerceptionResult
-from bas_har.schema.plan_schema import (
+from halo.perception.types import BBox, PerceptionResult
+from halo.schema.plan_schema import (
     EvidenceRule,
     ExperimentPlan,
     ObjectSpec,

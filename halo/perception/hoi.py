@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 
-from bas_har.perception.types import (
+from halo.perception.types import (
     BBox,
     Detection,
     HandKeypoints,
