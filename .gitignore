@@ -93,3 +93,12 @@ video/public/footage/
 # --- Presentation recording workspace ---
 presentation/
 video/public/pitch/
+
+# --- Local scratch, runtime and promo workspaces ---
+video_promo/
+tmp/
+output/
+.opencode/
+.claude/
+prior_frames/
+ref_frames/

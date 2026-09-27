@@ -1,4 +1,0 @@
-{"wall_s": 5.02, "video_s": 5.04, "analysed": 126, "skipped": 0, "display_dropped": 0, "lag_s": 0.02, "timings_ms": {"decode": 0.45, "detect": 13.24, "engine": 0.28, "draw": 3.76, "encode": 1.95}}
-{"wall_s": 10.02, "video_s": 10.03, "analysed": 251, "skipped": 0, "display_dropped": 0, "lag_s": 0.024, "timings_ms": {"decode": 0.5, "detect": 14.2, "engine": 0.29, "draw": 4.09, "encode": 1.58}}
-{"wall_s": 15.05, "video_s": 15.07, "analysed": 377, "skipped": 0, "display_dropped": 0, "lag_s": 0.018, "timings_ms": {"decode": 0.41, "detect": 13.38, "engine": 0.3, "draw": 3.43, "encode": 1.36}}
-{"wall_s": 20.05, "video_s": 20.07, "analysed": 502, "skipped": 0, "display_dropped": 0, "lag_s": 0.025, "timings_ms": {"decode": 0.39, "detect": 13.1, "engine": 0.35, "draw": 4.22, "encode": 1.7}}

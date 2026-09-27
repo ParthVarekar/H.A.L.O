@@ -1,2 +1,0 @@
-{"ts_utc":"2026-09-03T21:05:57.228000Z","exp_id":"BAS-DEMO-RBB-001","step_id":"open_big_box","step_status":"in_progress","confidence":0.9000000000000001,"evidence_summary":"0:Y1/ok","alert_code":null,"media_ref":null,"extra":{}}
-{"ts_utc":"2026-09-03T21:05:59.022000Z","exp_id":"BAS-DEMO-RBB-001","step_id":"open_big_box","step_status":"completed","confidence":0.9000000000000001,"evidence_summary":"0:Y30/ok","alert_code":null,"media_ref":null,"extra":{}}

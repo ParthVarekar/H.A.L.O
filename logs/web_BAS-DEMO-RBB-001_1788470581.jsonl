@@ -1,1 +1,0 @@
-{"ts_utc":"2026-09-03T21:24:02.188000Z","exp_id":"BAS-DEMO-RBB-001","step_id":"open_big_box","step_status":"anomalous","confidence":0.0,"evidence_summary":"no progress for pause_tolerance_s","alert_code":"PAUSE_EXCEEDED","media_ref":null,"extra":{}}

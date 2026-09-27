@@ -1,3 +1,0 @@
-{"payload":{"ts_utc":"2026-09-15T15:16:57.248000Z","exp_id":"cold_stowage_melfi","step_id":"step_01","step_status":"in_progress","confidence":0.783125102519989,"evidence_summary":"0:Y1/ok","alert_code":null,"media_ref":null,"extra":{}},"crc32":"4676236c"}
-{"payload":{"ts_utc":"2026-09-15T15:16:57.396000Z","exp_id":"cold_stowage_melfi","step_id":"step_01","step_status":"completed","confidence":0.5653394708633422,"evidence_summary":"0:Y5/ok","alert_code":null,"media_ref":null,"extra":{}},"crc32":"aacc0927"}
-{"payload":{"ts_utc":"2026-09-15T15:16:58.597000Z","exp_id":"cold_stowage_melfi","step_id":"step_02","step_status":"in_progress","confidence":0.0,"evidence_summary":"0:n0/object in another state","alert_code":null,"media_ref":null,"extra":{}},"crc32":"6b589f1f"}

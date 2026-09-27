@@ -66,7 +66,7 @@ cmd /c startup.bat live 0
 | 3b — React dashboard | done | `web/` plus `bas_har/web/server.py`: live frame, current step, telemetry, event stream, source controls, and port 5767 service |
 | 4 — IO (RTSP + MP4 circular buffer + CRC) | done | Web capture uses `VideoCaptureSource`, retains bounded MP4 segments, and writes CRC-verified JSONL events |
 | 5 — 3D HMR / Jetson / learned temporal head | NOT done (parked) | (renamed to Phase 9 in the plan) |
-| 6 — SIH idea submission docs | done | `output/pdf/SIH26174_AI_HAR_BAS_submission.pdf` |
+| 6 — SIH idea submission docs | done | `docs/` |
 | 7 — Packaging (ONNX export + PyInstaller) | partial | `train-yolo`, `prepare-yolo-dataset`, `annotate-yolo`, and `export-onnx` CLIs are ready; the React PyInstaller bundle is verified, while a trained model bundle remains |
 
 **115 pytest passing.** `ruff check` and `ruff format --check` both clean. The React build and web smoke pass.
@@ -276,7 +276,7 @@ The active UI is now a React dashboard served at `http://127.0.0.1:5767`. `web/`
 
 The PyInstaller React bundle was built and smoke-checked as `dist/bas-har-web.exe`; its packaged root page and health endpoint respond correctly on a temporary port.
 
-`startup.bat` builds the web bundle when needed, runs pytest, Ruff, plan validation, and the web smoke test, then starts the dashboard. The default and `web`/`video-gui` modes use `%USERPROFILE%\Downloads\on cell.mp4` when present. `live` accepts a webcam index, MP4 path, or RTSP URL. The current verified screenshot is `output/screenshots/bas_har_react_on_cell.png`.
+`startup.bat` builds the web bundle when needed, runs pytest, Ruff, plan validation, and the web smoke test, then starts the dashboard. The default and `web`/`video-gui` modes use `%USERPROFILE%\Downloads\on cell.mp4` when present. `live` accepts a webcam index, MP4 path, or RTSP URL.
 
 The old PySide6 UI was removed. The compatibility names `run-gui`, `run-web`, and `smoke_gui.py` now point to the React dashboard server or its smoke check. PySide6 is not a project dependency.
 
