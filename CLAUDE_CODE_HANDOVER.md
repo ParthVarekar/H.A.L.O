@@ -1,4 +1,4 @@
-# Claude Code Handover — bas-har
+# Claude Code Handover — H.A.L.O.
 
 Last updated: 2026-09-15 (see Section 19 for the current state; Sections 1-18 predate the real
 MELFI video and are retained for historical context)
@@ -68,9 +68,9 @@ annotation workflow, and record every new result in this document and docs/progr
 5. docs/validation_matrix.md
 6. docs/risk_register.md
 7. docs/progress_log.md
-8. bas_har/schema/plan_schema.py
-9. bas_har/procedure/engine.py
-10. bas_har/web/server.py
+8. halo/schema/plan_schema.py
+9. halo/procedure/engine.py
+10. halo/web/server.py
 11. web/src/App.jsx
 12. web/src/TrainingStudio.jsx
 
@@ -110,7 +110,7 @@ This currently performs:
 - headless React/web smoke test
 
 The last verified result was all green: 115 passed, Ruff clean, 96 files formatted, demo plan
-valid, and all BAS-HAR checks passed. Also verified separately with npm.cmd run build from web.
+valid, and all H.A.L.O. checks passed. Also verified separately with npm.cmd run build from web.
 
 The direct smoke commands are:
 
@@ -193,13 +193,13 @@ Important top-level files and directories:
 - startup.bat: general checks/dashboard/training launcher.
 - startup_training_studio.bat: Studio launcher on port 5767.
 - pyproject.toml: Python version, dependencies, extras, CLIs, Ruff, pytest.
-- bas_har/schema: plan, event, activity, take, annotation, dataset, job, evaluation, release
+- halo/schema: plan, event, activity, take, annotation, dataset, job, evaluation, release
   contracts.
-- bas_har/procedure: engine and evidence evaluation.
-- bas_har/perception: detector, pose, hands, HOI, and related inference code.
-- bas_har/io: capture, stream, buffer, and event output code.
-- bas_har/voice: TTS and confirmation feedback.
-- bas_har/web: local Python HTTP service and Studio API.
+- halo/procedure: engine and evidence evaluation.
+- halo/perception: detector, pose, hands, HOI, and related inference code.
+- halo/io: capture, stream, buffer, and event output code.
+- halo/voice: TTS and confirmation feedback.
+- halo/web: local Python HTTP service and Studio API.
 - web/src/App.jsx: React dashboard shell.
 - web/src/TrainingStudio.jsx: React training workflow and annotation UI.
 - web/src/styles.css: visual styling.
@@ -536,9 +536,9 @@ mission.
 "closed"]`) expands each class into per-state detector classes via `state_class`/`base_class`
 helpers and `ObjectSpec.detector_classes()` / `ExperimentPlan.detector_classes()` /
 `ExperimentPlan.class_states()`; the annotation `state` field carries this on each box, and dataset
-preparation (`bas_har/studio/datasets.py::annotation_class`) maps label+state to the right YOLO
+preparation (`halo/studio/datasets.py::annotation_class`) maps label+state to the right YOLO
 class, rewriting `data.yaml` whenever the plan's classes change (fixing a stale-class-list bug).
-`EvidenceRule.inside_of` mirrors the existing `outside_of` (`bas_har/procedure/evidence.py`,
+`EvidenceRule.inside_of` mirrors the existing `outside_of` (`halo/procedure/evidence.py`,
 `INSIDE_MIN_FRACTION = 0.8`) so a step can require one box mostly inside another, e.g. "sample
 inside the open compartment".
 
@@ -555,7 +555,7 @@ of these boxes — the owner explicitly said they would do the boxing and Claude
 set up the Studio. The Studio gained, to support this: a state picker tied to the selected class; a
 per-frame box list with redraw/change-state/delete; per-class colours; a show/hide box-labels
 toggle; "copy boxes from previous frame"; and `DELETE
-/api/activities/<id>/annotations/<annotation_id>` (`bas_har/studio/annotations.py::delete_annotation`).
+/api/activities/<id>/annotations/<annotation_id>` (`halo/studio/annotations.py::delete_annotation`).
 Drawing a new box always starts fresh even when the drag begins inside an existing box, so nested
 objects (sample inside compartment inside tray inside dewar) were already boxable — the earlier gap
 was in labelling coverage, not the drawing tool.
@@ -586,12 +586,12 @@ recognition): all 8 steps complete in order, zero alerts, each within about a se
 state-change time visible in the owner's own boxes.
 
 **Playback was measured at about 0.2x real time and is now 1.0x.** `SessionRunner`
-(`bas_har/web/server.py`) is now three threads — analysis (decode/detect/engine, unchanged logic),
+(`halo/web/server.py`) is now three threads — analysis (decode/detect/engine, unchanged logic),
 presenter (overlay + JPEG encode from a `LatestSlot`), recorder (MP4 backup via a drop-oldest
 queue, skipped entirely for uploads) — so no viewer or disk work can slow detection. File sources
 are paced to their own frame rate by `PlaybackClock`; the MJPEG stream is push-based
 (`WebState.wait_for_frame` on a `threading.Condition`) instead of polling at 30 Hz; JPEG encoding
-uses nvjpeg via `bas_har/web/frame_encoder.py` with an OpenCV fallback; the detector warms up
+uses nvjpeg via `halo/web/frame_encoder.py` with an OpenCV fallback; the detector warms up
 before playback starts. Status now exposes `realtime_factor`, `lag_s`, `timings_ms`, `display_fps`,
 `encoder`, `cpu_fallback`; the dashboard shows a live readout and a red CPU-fallback banner.
 Verified with a real browser attached, started the way `startup.bat` starts it: 1.000x real-time
@@ -632,19 +632,19 @@ Read this with `HANDOVER.md` Section 19, `docs/progress_log.md` Checkpoint 33 an
 rows 26-29. Nothing about trained activities changed; this is an additional mode.
 
 **New files**
-- `bas_har/perception/open_vocab.py` — `OpenVocabDetector`, same surface as `ObjectDetector`,
+- `halo/perception/open_vocab.py` — `OpenVocabDetector`, same surface as `ObjectDetector`,
   driven by text prompts instead of trained classes.
-- `bas_har/perception/vlm.py` — `build_prompt`, `parse_answers`, `FrameQuestioner` protocol,
+- `halo/perception/vlm.py` — `build_prompt`, `parse_answers`, `FrameQuestioner` protocol,
   `VisualQuestionAnswerer` (Qwen3-VL-2B), `AsyncVisualQuestioner` (background thread).
 - `activities/melfi_zeroshot/` — plan v0.3.0 + activity.yaml. No takes, no annotations, no model.
 - `tests/test_zero_shot.py` — 11 tests covering prompt mapping, the new rule kind, evidence with
   `expect`, prompt/answer parsing, and the async questioner's non-blocking behaviour.
 
-**Changed files**: `bas_har/schema/plan_schema.py` (`prompts`, `visual_question`, `expect`,
-`prompt_classes()`, `visual_questions()`), `bas_har/perception/types.py` (`questions`),
-`bas_har/perception/pipeline.py` (prompt/questioner wiring), `bas_har/procedure/evidence.py`
-(`_eval_question`), `bas_har/procedure/engine.py` (`_change_key`),
-`bas_har/web/server.py` (zero-shot selection, questioner lifecycle, status fields),
+**Changed files**: `halo/schema/plan_schema.py` (`prompts`, `visual_question`, `expect`,
+`prompt_classes()`, `visual_questions()`), `halo/perception/types.py` (`questions`),
+`halo/perception/pipeline.py` (prompt/questioner wiring), `halo/procedure/evidence.py`
+(`_eval_question`), `halo/procedure/engine.py` (`_change_key`),
+`halo/web/server.py` (zero-shot selection, questioner lifecycle, status fields),
 `web/src/App.jsx`, `web/src/TrainingStudio.jsx`, `web/src/styles.css`, `.gitignore`.
 
 **Rules for anyone editing a zero-shot plan**
@@ -671,13 +671,13 @@ Section 20 were wrong and are corrected there: the new video has two MELFI cycle
 equipment-visible guard never worked.
 
 **Code facts that changed**
-- `bas_har/perception/vlm.py`: `ask()` returns yes-probabilities from one forward pass over a
+- `halo/perception/vlm.py`: `ask()` returns yes-probabilities from one forward pass over a
   pre-filled answer (`filled_answer`, `ANSWER_FILLS`). `parse_answers`, `set_questions` and answer
   smoothing are gone (smoothing was measured and made things worse).
-- `bas_har/procedure/evidence.py`: `QUESTION_YES_MIN = 0.6`, `QUESTION_NO_MAX = 0.4`,
-  `question_verdict()`; `detections_needed()` (exported from `bas_har.procedure`).
-- `bas_har/perception/pipeline.py`: `run_detector=False` gives a pipeline with no detector.
-- `bas_har/web/server.py`: `_recognition_mode` -> `zero_shot` / `hybrid` / `trained`; status
+- `halo/procedure/evidence.py`: `QUESTION_YES_MIN = 0.6`, `QUESTION_NO_MAX = 0.4`,
+  `question_verdict()`; `detections_needed()` (exported from `halo.procedure`).
+- `halo/perception/pipeline.py`: `run_detector=False` gives a pipeline with no detector.
+- `halo/web/server.py`: `_recognition_mode` -> `zero_shot` / `hybrid` / `trained`; status
   `answers` is `{question: {"p": float, "verdict": "yes|no|unsure"}}`; `_active_questions` removed.
 - `web/src/TrainingStudio.jsx`: "done when: yes/no" picker; `expect` now survives load/save.
 

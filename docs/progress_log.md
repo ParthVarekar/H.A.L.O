@@ -901,3 +901,15 @@ Prompted by the competitor scan (51 rival repositories): we held real footage, r
   - Sound: synthesised whooshes, ticks, chimes and impacts, plus the dashboard's own 440 Hz alert, over a 112 BPM music bed that ducks under the voice line.
 - Third pass: every animation keeps its speed, and each beat is now followed by a short hold (0.6–1 s) so viewers can take it in. The scene freezes while the backdrop keeps drifting; holds are listed per scene in `video/src/Intro.tsx` and remapped with `<Freeze>`. The video is now 50.5 s. Also fixed the byte counter, which stopped at 10,494 instead of 1,002 because its easing never reached 1.
 - Fourth pass: the ISS footage no longer pauses. Its scene has no holds; instead the clip plays at 1.2x (was 1.7x) over a longer scene, so each detection box stays readable while the footage keeps moving. Box carry-over widened to 20 detection frames to bridge a 0.76 s gap in the hatch detections. The video is now 50.8 s.
+
+## 2026-09-28 — H.A.L.O. rename, presentation video, repo cleanup
+
+- Project renamed to H.A.L.O. (Human Activity Logging in Orbit); the package is `halo`, the
+  command is `python -m halo`, and the packaging spec is `packaging/halo_gui.spec` (`halo-web`).
+- Presentation video: all product clips re-recorded with a headless-Edge recorder (human cursor
+  motion, sorted screencast frames, a deflicker pass); the Remotion `Pitch` composition cuts them
+  into a 2:57 video with one reusable caption design, matched to the voice-over script. Grey
+  frames in the described-mode clip's video panel are repaired by holding the last good frame.
+- Repo cleanup: runtime logs, scratch, the promo workspace, old `output/` artefacts, local tool
+  state, reference frame dumps and the old BAS-HAR presentation script are no longer tracked.
+- Verified: 276 tests pass; `python -m halo verify` passes all 8 checks.

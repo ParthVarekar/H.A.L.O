@@ -102,3 +102,5 @@ output/
 .claude/
 prior_frames/
 ref_frames/
+~$*
+docs/BAS-HAR_Presentation_Script.docx

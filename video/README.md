@@ -1,7 +1,7 @@
 # H.A.L.O. videos
 
-Two Remotion compositions live here. `Intro` is the long project intro; `Launch` is a
-sub-10-second product launch cut.
+Three Remotion compositions live here. `Intro` is the long project intro; `Launch` is a
+sub-10-second product launch cut; `Pitch` is the 2:57 SIH presentation video.
 
 ## Commands
 
@@ -10,10 +10,11 @@ npm install
 npm run dev            # Remotion Studio, scrub either composition
 npm run render         # Intro   -> ../docs/assets/intro.mp4   (1089 frames, ~36 s)
 npm run render:launch  # Launch  -> ../docs/assets/launch.mp4  (288 frames, 9.66 s)
+npm run render:pitch   # Pitch   -> ../presentation/HALO_SIH_Presentation.mp4  (5314 frames, 2:57)
 ```
 
 - Single frame: `npx remotion still Launch out/frame.png --frame=200`.
-- Both compositions are 1920×1080 at 30 fps.
+- All compositions are 1920×1080 at 30 fps.
 
 ## `Launch` — the 9.7-second launch cut
 
@@ -85,3 +86,15 @@ ffmpeg -ss 12 -t 12 -i activities/cold_stowage_melfi/takes/slawosz_using_melfi-8
 ```
 
 Footage credit: ESA (European Space Agency), Ignis mission.
+
+## `Pitch` — the SIH presentation video
+
+`src/pitch/Pitch.tsx` cuts the recorded product clips into a title, the problem, the seven
+requested capabilities, seven extras and a close. Each segment is a `Beat` with one reusable
+`Caption` (bottom-left, or top-right when a terminal is on screen); trims, zooms and speed-ups are
+data in `SEGMENTS`.
+
+The clips come from the local, gitignored `presentation/` workspace (a headless-Edge recorder in
+`presentation/tools/`) and are copied into `public/pitch/`, which is also gitignored, so the
+composition renders only on a machine that has them. The voice-over script is
+`presentation/H.A.L.O._Voiceover_Script.docx`.

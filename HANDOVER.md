@@ -1,9 +1,10 @@
-# Handover — bas-har
+# Handover — H.A.L.O.
 
 **Repo**: `C:\Users\Parth\Desktop\HAR_for_BAS`
 **Authoritative spec**: `docs/SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx` (in `C:\Users\Parth\Downloads`)
 **Mission**: SIH26174 — AI HAR for on-board BAS experiments (ISRO, Gaganyaan/BAS-01 2028).
 **Branch you'll be picked up from**: main.
+**Current state (2026-09-28)**: renamed to H.A.L.O. (package `halo`); 276 pytest passing; `python -m halo verify` passes 8/8; the 2:57 presentation video renders from `video/` (`npm run render:pitch`). The status line below is kept for history.
 **Last verified state (2026-09-15, see Section 18)**: 193 pytest passing, `ruff check` and formatting clean, React dashboard build and smoke pass. The `cold_stowage_melfi` activity holds the real MELFI video, is boxed (775 boxes/55 frames), has a trained detector installed, and completes all 8 steps in order on the source video through the real dashboard. The section below (7) predates that work and is retained for historical/phase context only.
 
 ---
@@ -44,7 +45,7 @@ cmd /c startup.bat live 0
 `mediapipe==0.10.21` (the 1.x line removed `mp.solutions`). See `pyproject.toml`.
 
 **Console script entry points** (defined in `pyproject.toml`):
-- `bas-har` — placeholder, prints version (`python -m bas_har`)
+- `halo` — `python -m halo verify`, `verify-log`, `verify-downlink` (reproduce and check signed results)
 - `validate-plan` — `validate-plan <yaml>...`
 - `record-dataset` — webcam OR MP4 recorder
 - `preview-perception` — annotated live preview
@@ -58,12 +59,12 @@ cmd /c startup.bat live 0
 
 | Phase | Status | Notes |
 |---|---|---|
-| 0 — Schema + validator + demo plan | done | `bas_har/schema/`, `experiments/red_blue_box/experiment_plan.yaml`, `validate-plan` CLI |
+| 0 — Schema + validator + demo plan | done | `halo/schema/`, `experiments/red_blue_box/experiment_plan.yaml`, `validate-plan` CLI |
 | 1 — Perception pipeline | done | YOLOv11-n + MediaPipe Pose + Hands + HOI heuristic, ONNX-ready, `models/yolo11n.pt` cached |
 | 2 — Procedure engine | done | FSM, evidence evaluator, two-stage alert filter, JSONL sink; **works on a real MP4** via `run-engine` |
-| 3 — Region polygons / advanced evidence | done | `region_geometries` is schema-validated; `in_region` and `outside_of` evaluate BBox geometry in `bas_har/procedure/evidence.py`; demo YAML uses the restored rules |
-| 3a — Voice (TTS) | done | `bas_har/voice/tts.py` uses a queue+thread and shutdown handling; `voice` extra installs pyttsx3; TTS is enabled by default with `--no-tts` as opt-out |
-| 3b — React dashboard | done | `web/` plus `bas_har/web/server.py`: live frame, current step, telemetry, event stream, source controls, and port 5767 service |
+| 3 — Region polygons / advanced evidence | done | `region_geometries` is schema-validated; `in_region` and `outside_of` evaluate BBox geometry in `halo/procedure/evidence.py`; demo YAML uses the restored rules |
+| 3a — Voice (TTS) | done | `halo/voice/tts.py` uses a queue+thread and shutdown handling; `voice` extra installs pyttsx3; TTS is enabled by default with `--no-tts` as opt-out |
+| 3b — React dashboard | done | `web/` plus `halo/web/server.py`: live frame, current step, telemetry, event stream, source controls, and port 5767 service |
 | 4 — IO (RTSP + MP4 circular buffer + CRC) | done | Web capture uses `VideoCaptureSource`, retains bounded MP4 segments, and writes CRC-verified JSONL events |
 | 5 — 3D HMR / Jetson / learned temporal head | NOT done (parked) | (renamed to Phase 9 in the plan) |
 | 6 — SIH idea submission docs | done | `docs/` |
@@ -101,9 +102,9 @@ Cross-cutters:
 3. `docs/architecture.md` — phase architecture and boundaries.
 4. `docs/validation_matrix.md` — current pass/fail table.
 5. `docs/risk_register.md` — known issues and mitigations.
-6. `bas_har/schema/plan_schema.py` — the YAML schema contract.
-7. `bas_har/procedure/engine.py` — the FSM brain.
-8. `web/src/App.jsx`, `web/src/TrainingStudio.jsx`, and `bas_har/web/server.py` — the active React shell, Studio, and service.
+6. `halo/schema/plan_schema.py` — the YAML schema contract.
+7. `halo/procedure/engine.py` — the FSM brain.
+8. `web/src/App.jsx`, `web/src/TrainingStudio.jsx`, and `halo/web/server.py` — the active React shell, Studio, and service.
 
 ---
 
@@ -128,7 +129,7 @@ Cross-cutters:
 
 3. **A trained model bundle is still required for deployment packaging.** The generic PyInstaller React server is verified, but ONNX export and the final model asset should follow detector fine-tuning.
 
-4. **MediaPipe 0.10.21 + opencv-python<5 + numpy<2** is the only working combo on 3.11. If anyone bumps Python to 3.13+, they'll need to migrate `bas_har/perception/pose.py` and `bas_har/perception/hands.py` to the new `mediapipe.tasks` API.
+4. **MediaPipe 0.10.21 + opencv-python<5 + numpy<2** is the only working combo on 3.11. If anyone bumps Python to 3.13+, they'll need to migrate `halo/perception/pose.py` and `halo/perception/hands.py` to the new `mediapipe.tasks` API.
 
 5. **The dashboard polls status every 700 ms.** A completed MP4 remains visible as the last annotated frame and reports `Source complete`; a future UI iteration could add replay controls.
 
@@ -138,7 +139,7 @@ Cross-cutters:
 
 8. **The `engine.py` `_pick_next` resets accumulator state for candidate steps.** This is the right behavior for the transition path but means each frame resets the persistence counter. The skip path's `_find_later_step_match` does NOT reset, so skip detection has continuous persistence. If you change the engine, keep this asymmetry in mind.
 
-9. **YOLOv11n's class labels are COCO-pretrained**; the red/blue/big box classes are NOT in COCO. Once you record real takes and fine-tune, swap the model path in `bas_har/perception/detector.py` (or via `--yolo-model` on `preview-perception` / `run-engine`).
+9. **YOLOv11n's class labels are COCO-pretrained**; the red/blue/big box classes are NOT in COCO. Once you record real takes and fine-tune, swap the model path in `halo/perception/detector.py` (or via `--yolo-model` on `preview-perception` / `run-engine`).
 
 10. **The MELFI timeline was initially incomplete.** The final 48.04 seconds were reviewed from
     the actual video and added as two evidence-backed records: astronaut/computer activity through
@@ -179,7 +180,7 @@ tests/
   test_web.py                    (3 tests — web service surface and MJPEG stream)
 ```
 
-Total: 115 tests. All passing as of this handover. The continuation adds coverage in
+Total at this handover: 115 tests. As of 2026-09-28 the suite has 40 test files and 276 tests, all passing. The continuation adds coverage in
 `test_activity_schema.py`, `test_activity_registry.py`, `test_annotations.py`, `test_datasets.py`,
 `test_evaluation.py`, `test_jobs.py`, `test_quality.py`, `test_releases.py`, `test_takes.py`,
 `test_timeline.py`, and `test_web.py`.
@@ -214,7 +215,7 @@ The user wants the **fastest working prototype / MVP**. Per the locked decisions
 ## 10. Conventions the next agent MUST follow (from AGENTS.md)
 
 1. No comments unless asked. Code reads like prose.
-2. Schema-first: any new feature starts with a Pydantic model in `bas_har/schema/`.
+2. Schema-first: any new feature starts with a Pydantic model in `halo/schema/`.
 3. YAML is the only place experiment-specific knowledge lives. No hard-coded class names in Python.
 4. No ML deps in core `dependencies`; use the `perception` extra.
 5. Tests mandatory for every public function. No `_` prefixes unless private.
@@ -258,7 +259,7 @@ The older phase and issue notes above are historical. The following items are no
   checksummed candidates that require explicit reviewer approval before activation.
 - Activity dataset preparation assigns whole recording sessions, not individual videos, to splits;
   this prevents session leakage in the normal Training Studio workflow.
-- `packaging/bas_har_gui.spec` builds the React server executable; `dist/bas-har-web.exe` has passed packaged HTTP health and static-page checks.
+- `packaging/halo_gui.spec` builds the React server executable; `dist/halo-web.exe` has passed packaged HTTP health and static-page checks.
 - The test suite currently passes 115 tests and Ruff plus formatting are clean.
 - The dashboard video feed uses `/api/stream.mjpg` for continuous frames while telemetry remains independently polled.
 - The plan-driven color sequence recognizer accepts the supplied red/blue sorting video and emits six CRC-verified timed events. The verified run uses `cuda:0` at 42.5 FPS.
@@ -272,9 +273,9 @@ and learned temporal modeling remain parked by decision.
 
 ## 13. React dashboard continuation
 
-The active UI is now a React dashboard served at `http://127.0.0.1:5767`. `web/` contains the Vite source and production bundle. `bas_har/web/server.py` serves the bundle and exposes plan, status, event, frame, start, stop, and silence endpoints. Capture, perception, and the procedure engine run in a background session, with the annotated latest frame available at `/api/frame.jpg`.
+The active UI is now a React dashboard served at `http://127.0.0.1:5767`. `web/` contains the Vite source and production bundle. `halo/web/server.py` serves the bundle and exposes plan, status, event, frame, start, stop, and silence endpoints. Capture, perception, and the procedure engine run in a background session, with the annotated latest frame available at `/api/frame.jpg`.
 
-The PyInstaller React bundle was built and smoke-checked as `dist/bas-har-web.exe`; its packaged root page and health endpoint respond correctly on a temporary port.
+The PyInstaller React bundle was built and smoke-checked as `dist/halo-web.exe`; its packaged root page and health endpoint respond correctly on a temporary port.
 
 `startup.bat` builds the web bundle when needed, runs pytest, Ruff, plan validation, and the web smoke test, then starts the dashboard. The default and `web`/`video-gui` modes use `%USERPROFILE%\Downloads\on cell.mp4` when present. `live` accepts a webcam index, MP4 path, or RTSP URL.
 
@@ -408,9 +409,9 @@ video and is boxed, trained, and verified. Full detail is in `docs/progress_log.
   `ObjectSpec.states` (e.g. `open`/`closed`, `in`/`out`, `left`/`right`) expand into per-state
   detector classes (`ClassName__state`), and `EvidenceRule.inside_of` mirrors the existing
   `outside_of` so a step can require one box mostly inside another (e.g. "sample inside the open
-  compartment"). See `bas_har/schema/plan_schema.py` (`state_class`, `base_class`,
+  compartment"). See `halo/schema/plan_schema.py` (`state_class`, `base_class`,
   `ObjectSpec.detector_classes`, `ExperimentPlan.detector_classes/class_states`) and
-  `bas_har/procedure/evidence.py`.
+  `halo/procedure/evidence.py`.
 - **Owner boxed 775 boxes on 55 frames themselves** through the Studio (Claude Code does not box
   MELFI — that was an explicit instruction). The Studio gained a state picker, a per-frame box
   list (redraw/delete/change state), per-class colours, a show/hide-labels toggle, and "copy boxes
@@ -435,7 +436,7 @@ video and is boxed, trained, and verified. Full detail is in `docs/progress_log.
   now three threads (analysis / presenter / recorder) so browser or disk work can never slow
   detection; uploaded video is paced to its own frame rate (`PlaybackClock`); the MJPEG stream is
   push-based (`WebState.wait_for_frame`) instead of polling; JPEG encoding uses nvjpeg on the GPU
-  with an OpenCV fallback (`bas_har/web/frame_encoder.py`); the detector warms up before playback.
+  with an OpenCV fallback (`halo/web/frame_encoder.py`); the detector warms up before playback.
   Verified: 1.00x real-time factor, 25 fps delivered smoothly to a real browser client, unchanged
   step results. The dashboard shows a live speed readout and a red banner if it ever falls back to
   CPU with an NVIDIA GPU present.
@@ -462,15 +463,15 @@ of this section.
 New capability, added on the owner's instruction to find a way around per-video training. It does
 not replace anything: an activity with a trained detector behaves exactly as before.
 
-- **How an activity enters zero-shot mode.** `_analyze_video` in `bas_har/web/server.py` checks
+- **How an activity enters zero-shot mode.** `_analyze_video` in `halo/web/server.py` checks
   for `activities/<id>/models/detector.pt`. Missing, but the plan's objects have `prompts` ->
   `SessionRunner(zero_shot=True)`. Missing and no prompts -> the old refusal message.
-- **Open-vocabulary detection** (`bas_har/perception/open_vocab.py`): YOLOE with the MobileCLIP
+- **Open-vocabulary detection** (`halo/perception/open_vocab.py`): YOLOE with the MobileCLIP
   text encoder, given the plan's prompts via `ExperimentPlan.prompt_classes()`, which maps each
   prompt back to a plan class so evidence rules are unchanged. Needs `models/yoloe-11s-seg.pt` and
   `models/mobileclip_blt.ts` (the 600 MB encoder is gitignored; the loader chdirs to `models/` so
   Ultralytics can find it by its bare filename).
-- **Frame questions** (`bas_har/perception/vlm.py`): `VisualQuestionAnswerer` wraps
+- **Frame questions** (`halo/perception/vlm.py`): `VisualQuestionAnswerer` wraps
   Qwen3-VL-2B-Instruct (Apache-2.0) and answers every active question about one frame in a single
   call. `AsyncVisualQuestioner` runs it on a background thread with a newest-frame slot and a
   latest-answers dict, so the analysis thread never waits; answers arrive as
@@ -507,7 +508,7 @@ cycles, not one, and the "equipment visible" guard never worked. Full detail and
   same calibration. Keep all of a plan's questions in one call; alone, each question is biased to
   "yes".
 - **Dead band.** `question_verdict`: yes at >= 0.6, no at <= 0.4, unsure in between (matches
-  nothing). The constants are `QUESTION_YES_MIN` / `QUESTION_NO_MAX` in `bas_har/procedure/evidence.py`.
+  nothing). The constants are `QUESTION_YES_MIN` / `QUESTION_NO_MAX` in `halo/procedure/evidence.py`.
 - **No narrowing, no smoothing.** The questioner always asks the full set; smoothing was measured
   to delay short events and was removed.
 - **Detector skipped when unused.** Zero-shot plans with only `visual_question` rules run no

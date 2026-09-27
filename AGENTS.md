@@ -44,13 +44,19 @@ halo/
   io/                # capture, RTSP, MP4, JSONL (Phase 5)
   voice/             # TTS, silence (Phase 4)
   web/               # React dashboard and Python capture service (Phase 6)
+activities/          # one folder per activity: plan.yaml, activity.yaml, labels
 experiments/         # one folder per demo, each with experiment_plan.yaml
 datasets/            # recorded takes (gitignored)
 models/              # exported weights (gitignored)
-docs/                # architecture, SIH submission
+docs/                # architecture, requirements, verification, jury demo
 scripts/             # CLI utilities
 tests/               # pytest, mirrors halo/ structure
+web/                 # React dashboard (Vite)
+video/               # Remotion: Intro, Launch, Pitch (presentation video)
 ```
+
+Local only (gitignored): `logs/`, `keys/`, `presentation/` (recording workspace, clips, the final
+presentation MP4 and voice-over script), `video/public/pitch/`, `video_promo/`, `output/`, `tmp/`.
 
 ## Style
 
@@ -74,12 +80,13 @@ tests/               # pytest, mirrors halo/ structure
 
 - Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`).
 - Branch names: `phase-N-short-name` (e.g. `phase-3-procedure-engine`).
-- Don't commit datasets, models, `.venv`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`.
+- Don't commit datasets, models, `.venv`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, or any
+  of the local-only folders listed under Layout.
 
 ## When in doubt
 
 - Re-read `docs/architecture.md` and `docs/validation_matrix.md`.
-- Re-read the authoritative spec: `docs/SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx`.
+- Re-read the authoritative spec: `SIH26174_AI_HAR_BAS_TechnicalDoc_v1.0_2026-08-27.docx` (local copy in Downloads; not in the repo).
 - The Strategic Research doc has better terminology ("orientation-diverse augmentation" not
   "microgravity simulation") — prefer it for phrasing.
 - When a decision is irreversible and affects schema, ask the user. Otherwise, decide and
