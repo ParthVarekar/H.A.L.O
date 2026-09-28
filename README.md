@@ -282,6 +282,7 @@ recording, so every alert can be reviewed afterwards.
 |---|---|
 | [docs/SIH_REQUIREMENTS.md](docs/SIH_REQUIREMENTS.md) | Each SIH26174 requirement traced to code, tests and a demo moment |
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | Three commands to reproduce and check the results |
+| [docs/DEPLOYMENT_ROADMAP.md](docs/DEPLOYMENT_ROADMAP.md) | From the laptop prototype to on-board BAS operations, stage by stage |
 | [USP.md](USP.md) | What makes H.A.L.O. different |
 | [BOXING_GUIDE.md](BOXING_GUIDE.md) | Labelling video, written for non-programmers |
 | [training_guide.md](training_guide.md) | The Training Studio, end to end |
