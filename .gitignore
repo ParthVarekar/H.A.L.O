@@ -104,3 +104,11 @@ prior_frames/
 ref_frames/
 ~$*
 docs/BAS-HAR_Presentation_Script.docx
+
+# --- Internal handover notes and unused media (kept locally) ---
+CLAUDE_CODE_HANDOVER.md
+HANDOVER.md
+dataset_progress.md
+docs/assets/intro-full.mp4
+docs/assets/intro-poster.jpg
+docs/H.A.L.O._Presentation_Script.docx

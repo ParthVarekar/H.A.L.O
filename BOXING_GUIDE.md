@@ -127,9 +127,8 @@ can always be redrawn or deleted from the box list.
   recording of the same experiment), just carry on the same way — pick unboxed frames and box
   them the same way described above.
 
-For the exact list of object names and what they mean for the current activity, see
-`dataset_progress.md` in the project root — it has an up-to-date table for whichever experiment
-is currently being worked on.
+For the exact list of object names and what they mean for the current activity, see the
+activity's `plan.yaml` under `activities/<activity_id>/`.
 
 ## If something looks wrong
 

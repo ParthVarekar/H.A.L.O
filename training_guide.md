@@ -194,7 +194,7 @@ Restart `startup_training_studio.bat`, reload the page, and verify that the back
 
 ## AI coding-tool instructions
 
-Before changing code, read `HANDOVER.md`, `CLAUDE_CODE_HANDOVER.md`, `AGENTS.md`, `docs/architecture.md`, `docs/validation_matrix.md`, `docs/risk_register.md`, `halo/schema/plan_schema.py`, `halo/procedure/engine.py`, `halo/procedure/evidence.py`, and the React Studio files. Follow the schema-first design. Do not change the demo, edge target, or parked phases without asking the project owner. Do not add code comments. Run `cmd /c startup.bat test` before handoff and leave both tests and Ruff clean.
+Before changing code, read `AGENTS.md`, `docs/architecture.md`, `docs/validation_matrix.md`, `docs/risk_register.md`, `halo/schema/plan_schema.py`, `halo/procedure/engine.py`, `halo/procedure/evidence.py`, and the React Studio files. Follow the schema-first design. Do not change the demo, edge target, or parked phases without asking the project owner. Do not add code comments. Run `cmd /c startup.bat test` before handoff and leave both tests and Ruff clean.
 
 ## Current handoff
 

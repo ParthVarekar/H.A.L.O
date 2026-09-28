@@ -135,8 +135,7 @@ direct evidence. Contextual classes such as logos and title cards are currently 
 plan, so they must be labelled consistently or removed from the detector plan before the quality
 gate.
 
-The collaborator-facing operating instructions are in `training_guide.md`, and the dataset
-inventory and remaining work are in `dataset_progress.md`. The above describes the activity
+The collaborator-facing operating instructions are in `training_guide.md`. The above describes the activity
 intake before 2026-09-14; see the current-state section below for what superseded it.
 
 ## Current activity intake (2026-09-15)
