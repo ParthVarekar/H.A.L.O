@@ -83,8 +83,7 @@ of the red/blue box experiment to fine-tune the detector.
 - `halo/schema/cli.py` — `validate-plan` command. Loads, lints, summarises.
 - `halo/config.py` — runtime paths and env.
 - `experiments/red_blue_box/experiment_plan.yaml` — the demo plan.
-- `experiments/red_blue_box/notes.md` — recording protocol.
-+ `tests/` — 115 tests currently covering schema, procedure, web, studio, IO, capture, voice, and activity-package behavior.
++ `tests/` — 276 tests covering covering schema, procedure, web, studio, IO, capture, voice, and activity-package behavior.
 
 ## Design rules baked into the schema
 
@@ -135,7 +134,7 @@ direct evidence. Contextual classes such as logos and title cards are currently 
 plan, so they must be labelled consistently or removed from the detector plan before the quality
 gate.
 
-The collaborator-facing operating instructions are in `training_guide.md`. The above describes the activity
+The above describes the activity
 intake before 2026-09-14; see the current-state section below for what superseded it.
 
 ## Current activity intake (2026-09-15)
@@ -169,6 +168,6 @@ stream is push-based instead of polled, and JPEG encoding uses the GPU (nvjpeg) 
 fallback. Verified at 1.00x real-time factor with 25 fps delivered smoothly to a real browser
 client and unchanged step results.
 
-Full detail is `docs/progress_log.md` Checkpoints 27-32. The next milestone is a second
+The next milestone is a second
 independent MELFI recording session before any generalisation claim, and the deferred
 ice-vapour/fabric issue alerts.

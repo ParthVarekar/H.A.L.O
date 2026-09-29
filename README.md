@@ -165,7 +165,6 @@ cd web && npm install && npm run build && cd ..
 
 ```bash
 startup.bat                     # Operations dashboard at http://127.0.0.1:5767
-startup_training_studio.bat     # Training Studio
 cmd /c startup.bat test         # tests, lint and build
 startup.bat verify              # reproduce the ISS result and check its signatures
 ```
@@ -275,8 +274,6 @@ recording, so every alert can be reviewed afterwards.
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | Three commands to reproduce and check the results |
 | [docs/DEPLOYMENT_ROADMAP.md](docs/DEPLOYMENT_ROADMAP.md) | From the laptop prototype to on-board BAS operations, stage by stage |
 | [USP.md](USP.md) | What makes H.A.L.O. different |
-| [BOXING_GUIDE.md](BOXING_GUIDE.md) | Labelling video, written for non-programmers |
-| [training_guide.md](training_guide.md) | The Training Studio, end to end |
 | [docs/architecture.md](docs/architecture.md) | System design in depth |
 | [docs/validation_matrix.md](docs/validation_matrix.md) | What has been verified, and how |
 

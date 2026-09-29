@@ -112,3 +112,15 @@ docs/assets/intro.mp4
 docs/assets/intro.webp
 docs/assets/launch.mp4
 docs/H.A.L.O._Presentation_Script.docx
+
+# --- Developer-only and training material (kept locally) ---
+training_guide.md
+BOXING_GUIDE.md
+startup_training_studio.bat
+close_training_studio.bat
+close_startup.bat
+AGENTS.md
+docs/progress_log.md
+docs/risk_register.md
+experiments/red_blue_box/notes.md
+datasets/red_blue_box/preview_dump.jsonl

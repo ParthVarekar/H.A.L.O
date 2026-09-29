@@ -102,4 +102,4 @@ Goal: routine use on BAS experiments.
 | Vision-language model size on edge hardware | Lower question rate, a smaller model, or ground-only authoring |
 | Flight hardware may differ from Jetson | Keep the ONNX path portable; re-benchmark on the qualified board |
 
-See `docs/risk_register.md` for the full risk list.
+
