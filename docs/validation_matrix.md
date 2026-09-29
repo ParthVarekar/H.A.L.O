@@ -34,7 +34,7 @@
 > and a verbal description of the experiment."
 
 To check: hand `experiments/red_blue_box/experiment_plan.yaml` to someone who
-has never seen the experiment, give them `notes.md` for context, and ask them
+has never seen the experiment and ask them
 to describe the procedure in their own words. The description should be:
 
 1. Open the big box lid.
