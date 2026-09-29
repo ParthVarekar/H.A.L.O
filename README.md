@@ -30,15 +30,6 @@
 <br>
 
 <p align="center">
-  <img alt="H.A.L.O. intro: what it does, in under a minute" src="docs/assets/intro.webp" width="100%">
-</p>
-<p align="center">
-  <sub>H.A.L.O. in under a minute.</sub>
-</p>
-
-<br>
-
-<p align="center">
   <img alt="H.A.L.O. following the MELFI sample-stowage procedure on real ISS footage" src="docs/assets/demo.webp" width="100%">
 </p>
 <p align="center">

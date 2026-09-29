@@ -52,11 +52,10 @@ docs/                # architecture, requirements, verification, jury demo
 scripts/             # CLI utilities
 tests/               # pytest, mirrors halo/ structure
 web/                 # React dashboard (Vite)
-video/               # Remotion: Intro, Launch, Pitch (presentation video)
 ```
 
 Local only (gitignored): `logs/`, `keys/`, `presentation/` (recording workspace, clips, the final
-presentation MP4 and voice-over script), `video/public/pitch/`, `video_promo/`, `output/`, `tmp/`.
+presentation MP4 and voice-over script), `video/`, `video_promo/`, `output/`, `tmp/`.
 
 ## Style
 

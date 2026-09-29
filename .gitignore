@@ -85,14 +85,11 @@ logs/
 # --- Station signing keys (private) ---
 keys/
 
-# --- Remotion intro video ---
-video/node_modules/
-video/out/
-video/public/footage/
+# --- Local video-production workspace (not part of the product) ---
+video/
 
 # --- Presentation recording workspace ---
 presentation/
-video/public/pitch/
 
 # --- Local scratch, runtime and promo workspaces ---
 video_promo/
@@ -111,4 +108,7 @@ HANDOVER.md
 dataset_progress.md
 docs/assets/intro-full.mp4
 docs/assets/intro-poster.jpg
+docs/assets/intro.mp4
+docs/assets/intro.webp
+docs/assets/launch.mp4
 docs/H.A.L.O._Presentation_Script.docx
